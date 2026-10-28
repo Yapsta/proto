@@ -16,14 +16,11 @@ const ORDER: [u8; 32] = [
 ];
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    data_encoding::HEXLOWER.encode(bytes)
 }
 
 fn unhex(hex: &str) -> Vec<u8> {
-    (0..hex.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
-        .collect()
+    data_encoding::HEXLOWER.decode(hex.as_bytes()).unwrap()
 }
 
 fn vector_seed() -> Seed {
@@ -120,6 +117,18 @@ fn one_seed_gives_unlinkable_keys_per_instance() {
 }
 
 #[test]
+fn generated_secrets_are_fresh() {
+    assert_ne!(
+        Seed::generate().unwrap().as_bytes(),
+        Seed::generate().unwrap().as_bytes()
+    );
+    assert_ne!(
+        DeviceSecret::generate().unwrap().as_bytes(),
+        DeviceSecret::generate().unwrap().as_bytes()
+    );
+}
+
+#[test]
 fn the_phrase_round_trips() {
     let seed = Seed::generate().unwrap();
     let phrase = seed.phrase();
@@ -157,9 +166,14 @@ fn bad_phrases_are_refused() {
         };
     // 12 words is valid BIP-39 but not a Yapsta phrase (16 bytes).
     let twelve = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    // NFKD would map these to ASCII words; they are refused, not normalized.
+    let fullwidth = phrase.replacen('a', "\u{ff41}", 1);
+    let nbsp = phrase.replacen(' ', "\u{a0}", 1);
     for bad in [
         swapped.as_str(),
         twelve,
+        &fullwidth,
+        &nbsp,
         &words[..23].join(" "),
         "",
         "not a phrase",
@@ -230,14 +244,24 @@ fn a_tampered_or_foreign_list_is_refused() {
     );
 }
 
-/// The vector account key's signature over any `message`, derived by hand
-/// (§ 6.2) so a test can sign what the API would refuse to.
-fn sign_with_vector_account(message: &[u8]) -> Vec<u8> {
-    use ed25519_dalek::{Signer, SigningKey};
-    let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"yapsta/account/v1"), vector_seed().as_bytes());
+/// § 6.2's derivation by hand, on the hkdf crate: an independent check of the
+/// module's own HKDF, and a key a test can sign anything with.
+fn hand_derived(salt: &[u8], secret: &[u8; 32]) -> ed25519_dalek::SigningKey {
+    let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(salt), secret);
     let mut okm = [0; 32];
     hk.expand(VECTOR_SERVER_ID.as_bytes(), &mut okm).unwrap();
-    SigningKey::from_bytes(&okm)
+    ed25519_dalek::SigningKey::from_bytes(&okm)
+}
+
+fn vector_account_signing_key() -> ed25519_dalek::SigningKey {
+    hand_derived(b"yapsta/account/v1", vector_seed().as_bytes())
+}
+
+/// The vector account key's signature over any `message`, so a test can sign
+/// what the API would refuse to.
+fn sign_with_vector_account(message: &[u8]) -> Vec<u8> {
+    use ed25519_dalek::Signer;
+    vector_account_signing_key()
         .sign(message)
         .to_bytes()
         .to_vec()
@@ -313,7 +337,7 @@ fn list_limits() {
             Some(IdentityError::ListLimit)
         );
         // ...and so does the verifier, when another client signed it anyway.
-        let list = sign_unchecked(&bad);
+        let list = sign_raw(&bad.encode_to_vec());
         assert_eq!(
             verify_device_list(&account.public(), &list, NOW),
             Err(IdentityError::ListLimit)
@@ -329,6 +353,22 @@ fn list_limits() {
 }
 
 #[test]
+fn an_oversized_body_is_refused_before_it_is_verified() {
+    let account = vector_seed().account_key(&server_id());
+    // Correctly signed, so only the size can refuse it.
+    let at_limit = sign_raw(&vec![0; MAX_DEVICE_LIST_BODY]);
+    assert_ne!(
+        verify_device_list(&account.public(), &at_limit, NOW),
+        Err(IdentityError::ListLimit)
+    );
+    let over = sign_raw(&vec![0; MAX_DEVICE_LIST_BODY + 1]);
+    assert_eq!(
+        verify_device_list(&account.public(), &over, NOW),
+        Err(IdentityError::ListLimit)
+    );
+}
+
+#[test]
 fn a_body_that_does_not_decode_is_refused_after_the_signature() {
     let list = sign_raw(&[0xff, 0xff, 0xff]);
     let account = vector_seed().account_key(&server_id());
@@ -336,10 +376,6 @@ fn a_body_that_does_not_decode_is_refused_after_the_signature() {
         verify_device_list(&account.public(), &list, NOW),
         Err(IdentityError::BadBody)
     );
-}
-
-fn sign_unchecked(body: &DeviceListBody) -> SignedDeviceList {
-    sign_raw(&body.encode_to_vec())
 }
 
 /// Signs any bytes as a device list with the vector account key, bypassing
@@ -409,7 +445,7 @@ fn the_auth_transcript() {
     assert_eq!(&bytes[105..137], &account.to_bytes());
     assert_eq!(&bytes[137..], &device_pub.to_bytes());
 
-    let signature = device_key.sign_auth(&transcript);
+    let signature = device_key.sign_auth(&transcript).unwrap();
     assert_eq!(transcript.verify(&signature), Ok(()));
 
     // Any other connection, server or account: the signature no longer fits.
@@ -439,6 +475,70 @@ fn the_auth_transcript() {
         transcript.verify(&signature[..63]),
         Err(IdentityError::BadSignature)
     );
+
+    // A device key never signs a transcript naming another key.
+    let other_device = DeviceSecret::from_bytes(&[2; 32]).device_key(&sid);
+    assert_eq!(
+        other_device.sign_auth(&transcript),
+        Err(IdentityError::BadKey)
+    );
+
+    // The connection binding stays out of Debug.
+    let shown = format!("{transcript:?}");
+    assert!(!shown.contains("193") && !shown.contains("c1c1"), "{shown}"); // 0xc1
+    assert!(!shown.contains("226") && !shown.contains("e2e2"), "{shown}"); // 0xe2
+    assert!(shown.contains(VECTOR_SERVER_ID), "{shown}");
+}
+
+/// A signature with a small-order R: S = k·a, so S·B = k·A = R + k·A. Plain
+/// `verify` accepts it; `verify_strict` must not (§ 6.2).
+fn forge_small_order_r(key: &ed25519_dalek::SigningKey, message: &[u8]) -> Vec<u8> {
+    use curve25519_dalek::Scalar;
+    use sha2::{Digest, Sha512};
+    let r = unhex("0100000000000000000000000000000000000000000000000000000000000000");
+    let mut h = Sha512::new();
+    h.update(&r);
+    h.update(key.verifying_key().as_bytes());
+    h.update(message);
+    let k = Scalar::from_bytes_mod_order_wide(&h.finalize().into());
+    let s = k * key.to_scalar();
+    let signature = [r.as_slice(), s.as_bytes()].concat();
+    // Guard against the test going hollow: a lax verifier takes it.
+    let lax = ed25519_dalek::Signature::from_slice(&signature).unwrap();
+    assert!(ed25519_dalek::Verifier::verify(&key.verifying_key(), message, &lax).is_ok());
+    signature
+}
+
+#[test]
+fn a_small_order_r_is_refused() {
+    let account = vector_seed().account_key(&server_id());
+    let list = account.sign_device_list(&body(1, &[device(1)])).unwrap();
+    let mut message = b"yapsta/device-list/v1\0".to_vec();
+    message.extend_from_slice(&list.body);
+    let forged = SignedDeviceList {
+        signature: forge_small_order_r(&vector_account_signing_key(), &message),
+        ..list
+    };
+    assert_eq!(
+        verify_device_list(&account.public(), &forged, NOW),
+        Err(IdentityError::BadSignature)
+    );
+
+    // The same for the Auth transcript.
+    let sid = server_id();
+    let secret = DeviceSecret::from_bytes(&[1; 32]);
+    let device_pub = secret.device_key(&sid).public();
+    let account_pub = account.public();
+    let transcript = AuthTranscript {
+        server_id: &sid,
+        challenge: &[0xc1; 32],
+        exporter: &[0xe2; 32],
+        account_pub: &account_pub,
+        device_pub: &device_pub,
+    };
+    let device_signing = hand_derived(b"yapsta/device/v1", secret.as_bytes());
+    let forged = forge_small_order_r(&device_signing, &transcript.to_bytes());
+    assert_eq!(transcript.verify(&forged), Err(IdentityError::BadSignature));
 }
 
 #[test]

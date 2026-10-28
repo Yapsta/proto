@@ -14,9 +14,9 @@ bytes.workspace = true
 data-encoding.workspace = true
 ed25519-dalek.workspace = true
 getrandom.workspace = true
-hkdf.workspace = true
+hmac.workspace = true
 prost.workspace = true
-sha2.workspace = true
+sha2 = { workspace = true, features = ["zeroize"] }
 thiserror.workspace = true
 tokio-util = { workspace = true, features = ["codec"] }
 zeroize.workspace = true
@@ -27,6 +27,9 @@ prost-build.workspace = true
 protox.workspace = true
 
 [dev-dependencies]
+curve25519-dalek.workspace = true
+# The tests check the hand-written HKDF against the hkdf crate.
+hkdf.workspace = true
 prost-types.workspace = true
 
 [lints]

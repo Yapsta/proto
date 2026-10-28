@@ -10,11 +10,11 @@
 //!   the body bytes as received, and the body is decoded only after that.
 
 use std::collections::HashSet;
-use std::fmt;
+use std::fmt::{self, Write};
 
 use data_encoding::BASE32_NOPAD;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use hkdf::Hkdf;
+use hmac::{Hmac, KeyInit, Mac};
 use prost::Message;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
@@ -27,9 +27,15 @@ const DEVICE_LIST_PREFIX: &[u8] = b"yapsta/device-list/v1\0";
 const AUTH_PREFIX: &[u8] = b"yapsta/auth/v1\0";
 const SERVER_ID_LEN: usize = 26;
 const PHRASE_WORDS: usize = 24;
+/// The longest English BIP-39 word.
+const LONGEST_WORD: usize = 8;
 
 /// The most entries a device list may hold.
 pub const MAX_DEVICES: usize = 64;
+/// The largest device-list body accepted, checked before it is hashed or
+/// decoded. A full list of 64 entries encodes to about 3 KiB; the rest is room
+/// for fields a later version adds (§ 6.7).
+pub const MAX_DEVICE_LIST_BODY: usize = 16 * 1024;
 /// How far ahead a device certificate may expire: 90 days.
 pub const MAX_CERT_LIFETIME_SECS: u64 = 90 * 24 * 60 * 60;
 /// Clock skew allowed on top of [`MAX_CERT_LIFETIME_SECS`].
@@ -130,9 +136,14 @@ impl Seed {
     }
 
     /// Restores a seed from its recovery phrase: the BIP-39 English mnemonic
-    /// of the 32 bytes as entropy (never the BIP-39 PBKDF2 "seed").
+    /// of the 32 bytes as entropy (never the BIP-39 PBKDF2 "seed"). The
+    /// English words are ASCII, so other input is refused rather than
+    /// normalized into a copy that could not be zeroized.
     pub fn from_phrase(phrase: &str) -> Result<Self, IdentityError> {
-        let mnemonic = bip39::Mnemonic::parse_in(bip39::Language::English, phrase)
+        if !phrase.is_ascii() {
+            return Err(IdentityError::BadPhrase);
+        }
+        let mnemonic = bip39::Mnemonic::parse_in_normalized(bip39::Language::English, phrase)
             .map_err(|_| IdentityError::BadPhrase)?;
         if mnemonic.word_count() != PHRASE_WORDS {
             return Err(IdentityError::BadPhrase);
@@ -148,7 +159,10 @@ impl Seed {
     pub fn phrase(&self) -> Zeroizing<String> {
         let mnemonic = bip39::Mnemonic::from_entropy_in(bip39::Language::English, &self.0[..])
             .expect("32 bytes is a valid BIP-39 entropy length");
-        Zeroizing::new(mnemonic.to_string())
+        // Sized up front: growing would free partial copies unzeroized.
+        let mut phrase = Zeroizing::new(String::with_capacity(PHRASE_WORDS * (LONGEST_WORD + 1)));
+        write!(phrase, "{mnemonic}").expect("writing to a String never fails");
+        phrase
     }
 
     /// This seed's account key on one instance.
@@ -229,10 +243,13 @@ impl DeviceKey {
         PublicKey(self.0.verifying_key())
     }
 
-    /// Signs `transcript`, which must name this key as its `device_pub`.
-    pub fn sign_auth(&self, transcript: &AuthTranscript<'_>) -> [u8; 64] {
-        debug_assert_eq!(transcript.device_pub, &self.public());
-        self.0.sign(&transcript.to_bytes()).to_bytes()
+    /// Signs `transcript`. Refuses one that names another key as its
+    /// `device_pub`, which no server would accept.
+    pub fn sign_auth(&self, transcript: &AuthTranscript<'_>) -> Result<[u8; 64], IdentityError> {
+        if transcript.device_pub != &self.public() {
+            return Err(IdentityError::BadKey);
+        }
+        Ok(self.0.sign(&transcript.to_bytes()).to_bytes())
     }
 }
 
@@ -301,6 +318,9 @@ pub fn verify_device_list(
     list: &SignedDeviceList,
     cap: ExpiryCap,
 ) -> Result<DeviceListBody, IdentityError> {
+    if list.body.len() > MAX_DEVICE_LIST_BODY {
+        return Err(IdentityError::ListLimit);
+    }
     account.verify(&[DEVICE_LIST_PREFIX, &list.body].concat(), &list.signature)?;
     let body = DeviceListBody::decode(list.body.as_slice()).map_err(|_| IdentityError::BadBody)?;
     check_limits(&body)?;
@@ -333,7 +353,7 @@ fn check_limits(body: &DeviceListBody) -> Result<(), IdentityError> {
 
 /// What a device signs in `Auth`: every field has a fixed length, so the
 /// concatenation after the domain prefix is unambiguous.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct AuthTranscript<'a> {
     /// Recomputed from the pinned SPKI by the client.
     pub server_id: &'a ServerId,
@@ -366,18 +386,47 @@ impl AuthTranscript<'_> {
     }
 }
 
+/// The challenge and the exporter are this connection's binding: kept out of
+/// logs, like everything a stray `{:?}` could reach.
+impl fmt::Debug for AuthTranscript<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            server_id,
+            challenge: _,
+            exporter: _,
+            account_pub,
+            device_pub,
+        } = self;
+        f.debug_struct("AuthTranscript")
+            .field("server_id", server_id)
+            .field("challenge", &"<redacted>")
+            .field("exporter", &"<redacted>")
+            .field("account_pub", account_pub)
+            .field("device_pub", device_pub)
+            .finish()
+    }
+}
+
 fn random() -> Result<Zeroizing<[u8; 32]>, IdentityError> {
     let mut bytes = Zeroizing::new([0; 32]);
     getrandom::fill(&mut bytes[..]).map_err(|_| IdentityError::Rng)?;
     Ok(bytes)
 }
 
-/// HKDF-SHA256: extract with `salt` over the 32-byte `secret`, expand with the
-/// server id's ASCII to 32 bytes, used as the Ed25519 secret key (RFC 8032).
+/// HKDF-SHA256 (RFC 5869): extract with `salt` over the 32-byte `secret`,
+/// expand with the server id's ASCII to 32 bytes (one block), used as the
+/// Ed25519 secret key (RFC 8032). Written on hmac, whose state and outputs are
+/// zeroized on drop; the hkdf crate keeps its PRK in a value it never clears.
 fn derive(secret: &[u8; 32], salt: &[u8], server_id: &ServerId) -> SigningKey {
-    let mut okm = Zeroizing::new([0; 32]);
-    Hkdf::<Sha256>::new(Some(salt), secret)
-        .expand(server_id.as_bytes(), &mut okm[..])
-        .expect("32 bytes is a valid HKDF-SHA256 output length");
-    SigningKey::from_bytes(&okm)
+    let mut extract = Hmac::<Sha256>::new_from_slice(salt).expect("HMAC takes any key length");
+    extract.update(secret);
+    let prk = extract.finalize();
+    let mut expand =
+        Hmac::<Sha256>::new_from_slice(prk.as_bytes()).expect("HMAC takes any key length");
+    expand.update(server_id.as_bytes());
+    expand.update(&[1]);
+    let okm = expand.finalize();
+    let mut key = Zeroizing::new([0; 32]);
+    key.copy_from_slice(okm.as_bytes());
+    SigningKey::from_bytes(&key)
 }
