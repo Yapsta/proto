@@ -26,6 +26,12 @@ const DEVICE_SALT: &[u8] = b"yapsta/device/v1";
 const DEVICE_LIST_PREFIX: &[u8] = b"yapsta/device-list/v1\0";
 const AUTH_PREFIX: &[u8] = b"yapsta/auth/v1\0";
 const SERVER_ID_LEN: usize = 26;
+
+/// The TLS exporter `Auth` is bound to (§ 6.2): this label, an **empty**
+/// context (`b""` with quinn, `Some(b"")` with rustls), [`EXPORTER_LEN`]
+/// bytes. Stable API (§ 6.7).
+pub const EXPORTER_LABEL: &[u8] = b"yapsta-auth";
+pub const EXPORTER_LEN: usize = 32;
 const PHRASE_WORDS: usize = 24;
 /// The longest English BIP-39 word.
 const LONGEST_WORD: usize = 8;
@@ -359,8 +365,8 @@ pub struct AuthTranscript<'a> {
     pub server_id: &'a ServerId,
     /// `Hello.challenge`.
     pub challenge: &'a [u8; 32],
-    /// The TLS exporter: label `yapsta-auth`, empty context, 32 bytes.
-    pub exporter: &'a [u8; 32],
+    /// The TLS exporter: [`EXPORTER_LABEL`], empty context, [`EXPORTER_LEN`] bytes.
+    pub exporter: &'a [u8; EXPORTER_LEN],
     pub account_pub: &'a PublicKey,
     pub device_pub: &'a PublicKey,
 }

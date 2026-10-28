@@ -60,11 +60,13 @@ impl fmt::Debug for Error {
             code,
             message,
             retry_after_ms,
+            device_list,
         } = self;
         f.debug_struct("Error")
             .field("code", &Code(*code))
             .field("message", &Redacted(message.len()))
             .field("retry_after_ms", retry_after_ms)
+            .field("device_list", device_list)
             .finish()
     }
 }

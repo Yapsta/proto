@@ -77,6 +77,7 @@ impl v1::Error {
             code: code.into(),
             message: message.to_owned(),
             retry_after_ms: None,
+            device_list: None,
         }
     }
 }
