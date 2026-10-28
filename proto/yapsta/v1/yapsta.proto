@@ -1,0 +1,221 @@
+// Yapsta's native protocol, version 1 (docs/ARCHITECTURE.md § 6).
+//
+// Stable API from M1 on (§ 6.7): fields, numbers, types and enum values are only
+// ever added. Never renumber, retype or repurpose a field; never move a field into
+// or out of a oneof; retired numbers and names are `reserved`. Every enum's 0 is
+// `*_UNSPECIFIED`. Relays forward received bytes and never re-encode them.
+
+syntax = "proto3";
+
+package yapsta.v1;
+
+// One frame: a u32 big-endian length, then these bytes (§ 6.1).
+message Envelope {
+  // 0 = none. Set on requests, on commands that want a reply, and on every frame
+  // of the reply.
+  uint32 request_id = 1;
+  // True on the final frame of a reply.
+  bool last = 2;
+  oneof body {
+    Error error = 3;
+    Hello hello = 4;
+    Auth auth = 5;
+    Welcome welcome = 6;
+    // Persistent, carries seq (§ 6.3).
+    Event event = 7;
+    // No seq (§ 6.3).
+    Ephemeral ephemeral = 8;
+    SetPresence set_presence = 9;
+    // Empty success reply.
+    Ack ack = 10;
+    // Replied to with Ack; keepalive on TCP.
+    Ping ping = 11;
+  }
+}
+
+// Stable codes; each is also the connection close code (§ 6.1).
+enum ErrorCode {
+  // Normal close. Never sent in an Error.
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_UNAUTHENTICATED = 1;
+  ERROR_CODE_FORBIDDEN = 2;
+  ERROR_CODE_NOT_FOUND = 3;
+  ERROR_CODE_RATE_LIMITED = 4;
+  ERROR_CODE_INVALID = 5;
+  ERROR_CODE_CONFLICT = 6;
+  ERROR_CODE_TOO_LARGE = 7;
+  ERROR_CODE_UNAVAILABLE = 8;
+  ERROR_CODE_SLOW_CONSUMER = 9;
+  ERROR_CODE_UNSUPPORTED_VERSION = 10;
+  ERROR_CODE_DEVICE_NOT_LISTED = 11;
+  ERROR_CODE_DEVICE_EXPIRED = 12;
+  ERROR_CODE_SESSION_REPLACED = 13;
+}
+
+message Error {
+  ErrorCode code = 1;
+  // Fixed server text for people, at most 256 bytes; never user content, never
+  // parsed by clients.
+  string message = 2;
+  optional uint64 retry_after_ms = 3;
+}
+
+// Optional features; on only when both sides list them (§ 6.2). M1 defines none.
+enum Capability {
+  CAPABILITY_UNSPECIFIED = 0;
+}
+
+// Handshake (§ 6.2).
+
+message Hello {
+  // 26 lowercase base32 characters; clients recompute it from the pinned SPKI.
+  string server_id = 1;
+  // Accepted minor versions, highest first (§ 6.7).
+  repeated uint32 versions = 2;
+  // 32 bytes from the OS RNG, fresh per connection.
+  bytes challenge = 3;
+  repeated Capability capabilities = 4;
+  // Empty in M1; M2 adds its fields.
+  SpacePublicInfo space_public_info = 5;
+}
+
+message SpacePublicInfo {}
+
+message Auth {
+  // The highest entry of Hello.versions the client speaks.
+  uint32 version = 1;
+  // How the client proves who it is. M7 adds a bot token beside `device`
+  // (§ 6.2); a field never moves into a oneof later (§ 6.7), so the oneof is
+  // here from the start.
+  oneof credential {
+    DeviceCredential device = 2;
+  }
+  repeated Capability capabilities = 3;
+  ClientInfo client_info = 4;
+  // The initial account status (§ 6.3).
+  optional PresenceStatus presence = 5;
+  optional Resume resume = 6;
+}
+
+// A person's device (§ 6.2).
+message DeviceCredential {
+  // 32 bytes.
+  bytes account_pub = 1;
+  SignedDeviceList device_list = 2;
+  // 32 bytes, this instance's device key.
+  bytes device_pub = 3;
+  // 64 bytes: the device key's Ed25519 signature over the Auth transcript.
+  bytes signature = 4;
+}
+
+message ClientInfo {
+  // At most 64 bytes each; held in memory for the session only.
+  string name = 1;
+  string version = 2;
+}
+
+message Resume {
+  // 32 opaque bytes from the previous Welcome.
+  bytes token = 1;
+  uint64 last_seq = 2;
+}
+
+message Welcome {
+  uint64 session_id = 1;
+  // Members only.
+  optional uint64 account_id = 2;
+  optional Member membership = 3;
+  optional bytes resume_token = 4;
+  // The stored device list (§ 6.2).
+  optional SignedDeviceList device_list = 5;
+  oneof state {
+    Snapshot snapshot = 6;
+    Resumed resumed = 7;
+  }
+}
+
+// Device lists (§ 6.2). `body` is the encoded DeviceListBody exactly as signed;
+// receivers verify the received bytes and never re-encode them.
+message SignedDeviceList {
+  bytes body = 1;
+  bytes signature = 2;
+}
+
+message DeviceListBody {
+  // A per-instance counter, at least 1.
+  uint64 version = 1;
+  repeated DeviceEntry devices = 2;
+}
+
+message DeviceEntry {
+  // 32 bytes, this instance's device key.
+  bytes device_pub = 1;
+  // Unix seconds.
+  uint64 expires_at = 2;
+}
+
+// Events (§ 6.3).
+
+message Event {
+  uint64 seq = 1;
+  oneof kind {
+    MemberJoined member_joined = 2;
+  }
+}
+
+message MemberJoined {
+  Member member = 1;
+}
+
+message Member {
+  uint64 account_id = 1;
+  // Unix seconds.
+  uint64 joined_at = 2;
+}
+
+message Ephemeral {
+  oneof kind {
+    PresenceUpdate presence_update = 1;
+  }
+}
+
+enum PresenceStatus {
+  PRESENCE_STATUS_UNSPECIFIED = 0;
+  // Only ever seen by others; invalid in SetPresence.
+  PRESENCE_STATUS_OFFLINE = 1;
+  PRESENCE_STATUS_ONLINE = 2;
+  PRESENCE_STATUS_IDLE = 3;
+  PRESENCE_STATUS_DND = 4;
+  PRESENCE_STATUS_INVISIBLE = 5;
+}
+
+message PresenceUpdate {
+  uint64 account_id = 1;
+  PresenceStatus status = 2;
+  // At most 128 bytes of UTF-8.
+  string custom_status = 3;
+}
+
+message SetPresence {
+  optional PresenceStatus status = 1;
+  optional bool afk = 2;
+  // Empty clears it.
+  optional string custom_status = 3;
+}
+
+message Snapshot {
+  uint64 seq = 1;
+  // Your own membership.
+  Member member = 2;
+  // Online members.
+  repeated PresenceUpdate presences = 3;
+}
+
+message Resumed {
+  // Current presence of online members; ephemeral events are not replayed.
+  repeated PresenceUpdate presences = 1;
+}
+
+message Ack {}
+
+message Ping {}

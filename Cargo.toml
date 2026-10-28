@@ -1,0 +1,26 @@
+[package]
+name = "yapsta-proto"
+description = "Yapsta's native wire protocol: messages, error codes and the frame codec (docs/ARCHITECTURE.md § 6)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+bytes.workspace = true
+prost.workspace = true
+thiserror.workspace = true
+tokio-util = { workspace = true, features = ["codec"] }
+
+[build-dependencies]
+prost.workspace = true
+prost-build.workspace = true
+protox.workspace = true
+
+[dev-dependencies]
+prost-types.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,105 @@
+enum yapsta.v1.Capability.CAPABILITY_UNSPECIFIED = 0
+enum yapsta.v1.ErrorCode.ERROR_CODE_CONFLICT = 6
+enum yapsta.v1.ErrorCode.ERROR_CODE_DEVICE_EXPIRED = 12
+enum yapsta.v1.ErrorCode.ERROR_CODE_DEVICE_NOT_LISTED = 11
+enum yapsta.v1.ErrorCode.ERROR_CODE_FORBIDDEN = 2
+enum yapsta.v1.ErrorCode.ERROR_CODE_INVALID = 5
+enum yapsta.v1.ErrorCode.ERROR_CODE_NOT_FOUND = 3
+enum yapsta.v1.ErrorCode.ERROR_CODE_RATE_LIMITED = 4
+enum yapsta.v1.ErrorCode.ERROR_CODE_SESSION_REPLACED = 13
+enum yapsta.v1.ErrorCode.ERROR_CODE_SLOW_CONSUMER = 9
+enum yapsta.v1.ErrorCode.ERROR_CODE_TOO_LARGE = 7
+enum yapsta.v1.ErrorCode.ERROR_CODE_UNAUTHENTICATED = 1
+enum yapsta.v1.ErrorCode.ERROR_CODE_UNAVAILABLE = 8
+enum yapsta.v1.ErrorCode.ERROR_CODE_UNSPECIFIED = 0
+enum yapsta.v1.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION = 10
+enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_DND = 4
+enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_IDLE = 3
+enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_INVISIBLE = 5
+enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_OFFLINE = 1
+enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_ONLINE = 2
+enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_UNSPECIFIED = 0
+field yapsta.v1.Auth.capabilities = 3 repeated .yapsta.v1.Capability
+field yapsta.v1.Auth.client_info = 4 singular .yapsta.v1.ClientInfo
+field yapsta.v1.Auth.device = 2 singular .yapsta.v1.DeviceCredential oneof credential
+field yapsta.v1.Auth.presence = 5 optional .yapsta.v1.PresenceStatus
+field yapsta.v1.Auth.resume = 6 optional .yapsta.v1.Resume
+field yapsta.v1.Auth.version = 1 singular uint32
+field yapsta.v1.ClientInfo.name = 1 singular string
+field yapsta.v1.ClientInfo.version = 2 singular string
+field yapsta.v1.DeviceCredential.account_pub = 1 singular bytes
+field yapsta.v1.DeviceCredential.device_list = 2 singular .yapsta.v1.SignedDeviceList
+field yapsta.v1.DeviceCredential.device_pub = 3 singular bytes
+field yapsta.v1.DeviceCredential.signature = 4 singular bytes
+field yapsta.v1.DeviceEntry.device_pub = 1 singular bytes
+field yapsta.v1.DeviceEntry.expires_at = 2 singular uint64
+field yapsta.v1.DeviceListBody.devices = 2 repeated .yapsta.v1.DeviceEntry
+field yapsta.v1.DeviceListBody.version = 1 singular uint64
+field yapsta.v1.Envelope.ack = 10 singular .yapsta.v1.Ack oneof body
+field yapsta.v1.Envelope.auth = 5 singular .yapsta.v1.Auth oneof body
+field yapsta.v1.Envelope.ephemeral = 8 singular .yapsta.v1.Ephemeral oneof body
+field yapsta.v1.Envelope.error = 3 singular .yapsta.v1.Error oneof body
+field yapsta.v1.Envelope.event = 7 singular .yapsta.v1.Event oneof body
+field yapsta.v1.Envelope.hello = 4 singular .yapsta.v1.Hello oneof body
+field yapsta.v1.Envelope.last = 2 singular bool
+field yapsta.v1.Envelope.ping = 11 singular .yapsta.v1.Ping oneof body
+field yapsta.v1.Envelope.request_id = 1 singular uint32
+field yapsta.v1.Envelope.set_presence = 9 singular .yapsta.v1.SetPresence oneof body
+field yapsta.v1.Envelope.welcome = 6 singular .yapsta.v1.Welcome oneof body
+field yapsta.v1.Ephemeral.presence_update = 1 singular .yapsta.v1.PresenceUpdate oneof kind
+field yapsta.v1.Error.code = 1 singular .yapsta.v1.ErrorCode
+field yapsta.v1.Error.message = 2 singular string
+field yapsta.v1.Error.retry_after_ms = 3 optional uint64
+field yapsta.v1.Event.member_joined = 2 singular .yapsta.v1.MemberJoined oneof kind
+field yapsta.v1.Event.seq = 1 singular uint64
+field yapsta.v1.Hello.capabilities = 4 repeated .yapsta.v1.Capability
+field yapsta.v1.Hello.challenge = 3 singular bytes
+field yapsta.v1.Hello.server_id = 1 singular string
+field yapsta.v1.Hello.space_public_info = 5 singular .yapsta.v1.SpacePublicInfo
+field yapsta.v1.Hello.versions = 2 repeated uint32
+field yapsta.v1.Member.account_id = 1 singular uint64
+field yapsta.v1.Member.joined_at = 2 singular uint64
+field yapsta.v1.MemberJoined.member = 1 singular .yapsta.v1.Member
+field yapsta.v1.PresenceUpdate.account_id = 1 singular uint64
+field yapsta.v1.PresenceUpdate.custom_status = 3 singular string
+field yapsta.v1.PresenceUpdate.status = 2 singular .yapsta.v1.PresenceStatus
+field yapsta.v1.Resume.last_seq = 2 singular uint64
+field yapsta.v1.Resume.token = 1 singular bytes
+field yapsta.v1.Resumed.presences = 1 repeated .yapsta.v1.PresenceUpdate
+field yapsta.v1.SetPresence.afk = 2 optional bool
+field yapsta.v1.SetPresence.custom_status = 3 optional string
+field yapsta.v1.SetPresence.status = 1 optional .yapsta.v1.PresenceStatus
+field yapsta.v1.SignedDeviceList.body = 1 singular bytes
+field yapsta.v1.SignedDeviceList.signature = 2 singular bytes
+field yapsta.v1.Snapshot.member = 2 singular .yapsta.v1.Member
+field yapsta.v1.Snapshot.presences = 3 repeated .yapsta.v1.PresenceUpdate
+field yapsta.v1.Snapshot.seq = 1 singular uint64
+field yapsta.v1.Welcome.account_id = 2 optional uint64
+field yapsta.v1.Welcome.device_list = 5 optional .yapsta.v1.SignedDeviceList
+field yapsta.v1.Welcome.membership = 3 optional .yapsta.v1.Member
+field yapsta.v1.Welcome.resume_token = 4 optional bytes
+field yapsta.v1.Welcome.resumed = 7 singular .yapsta.v1.Resumed oneof state
+field yapsta.v1.Welcome.session_id = 1 singular uint64
+field yapsta.v1.Welcome.snapshot = 6 singular .yapsta.v1.Snapshot oneof state
+message yapsta.v1.Ack
+message yapsta.v1.Auth
+message yapsta.v1.ClientInfo
+message yapsta.v1.DeviceCredential
+message yapsta.v1.DeviceEntry
+message yapsta.v1.DeviceListBody
+message yapsta.v1.Envelope
+message yapsta.v1.Ephemeral
+message yapsta.v1.Error
+message yapsta.v1.Event
+message yapsta.v1.Hello
+message yapsta.v1.Member
+message yapsta.v1.MemberJoined
+message yapsta.v1.Ping
+message yapsta.v1.PresenceUpdate
+message yapsta.v1.Resume
+message yapsta.v1.Resumed
+message yapsta.v1.SetPresence
+message yapsta.v1.SignedDeviceList
+message yapsta.v1.Snapshot
+message yapsta.v1.SpacePublicInfo
+message yapsta.v1.Welcome
