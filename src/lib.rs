@@ -69,7 +69,8 @@ impl v1::ErrorCode {
 
 impl v1::Error {
     /// An `Error` frame. The message is fixed server text (`&'static str`):
-    /// never user content (§ 6.1), so it can't leak through logs or `Debug`.
+    /// never user content (§ 6.1). A *received* `Error.message` is still peer
+    /// text: `Debug` redacts it (debug.rs), and it never goes into a log line.
     pub fn new(code: v1::ErrorCode, message: &'static str) -> Self {
         Self {
             code: code.into(),

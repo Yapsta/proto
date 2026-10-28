@@ -1,5 +1,6 @@
-//! `Debug` for the messages that carry a secret (resume tokens) or user text
-//! (client info, custom status): the shape and lengths only. ARCHITECTURE § 6.2
+//! `Debug` for the messages that carry a secret (resume tokens), user text
+//! (client info, custom status) or other bytes a peer fills freely (error text,
+//! signed device-list bodies): the shape and lengths only. ARCHITECTURE § 6.2
 //! and § 6.3 say these are never logged; this keeps a stray `{:?}` from doing so.
 //!
 //! The messages are listed in `redacted_debug.txt` (read by build.rs), and
@@ -10,7 +11,8 @@
 use std::fmt;
 
 use crate::v1::{
-    ClientInfo, PresenceStatus, PresenceUpdate, Resume, SetPresence, Welcome, welcome,
+    ClientInfo, Error, ErrorCode, PresenceStatus, PresenceUpdate, Resume, SetPresence,
+    SignedDeviceList, Welcome, welcome,
 };
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -35,6 +37,45 @@ impl fmt::Debug for Status {
             Ok(status) => status.fmt(f),
             Err(_) => write!(f, "Unknown({})", self.0),
         }
+    }
+}
+
+/// An error code as received: a value from a newer peer shows as its number.
+struct Code(i32);
+
+impl fmt::Debug for Code {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match ErrorCode::try_from(self.0) {
+            Ok(code) => code.fmt(f),
+            Err(_) => write!(f, "Unknown({})", self.0),
+        }
+    }
+}
+
+// A decoded Error's text comes from the peer, not from `Error::new`'s
+// `&'static str`: it is redacted like any other peer text.
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            code,
+            message,
+            retry_after_ms,
+        } = self;
+        f.debug_struct("Error")
+            .field("code", &Code(*code))
+            .field("message", &Redacted(message.len()))
+            .field("retry_after_ms", retry_after_ms)
+            .finish()
+    }
+}
+
+impl fmt::Debug for SignedDeviceList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { body, signature } = self;
+        f.debug_struct("SignedDeviceList")
+            .field("body", &Redacted(body.len()))
+            .field("signature", signature)
+            .finish()
     }
 }
 

@@ -305,6 +305,59 @@ fn debug_output_redacts_secrets_and_user_text() {
 }
 
 #[test]
+fn debug_output_redacts_peer_filled_fields_after_decoding() {
+    // What a peer could send: its own error text and an arbitrary list body.
+    let sent = [
+        Envelope {
+            request_id: 1,
+            last: true,
+            body: Some(Body::Error(Error {
+                code: 99,
+                message: "peer-secret".to_owned(),
+                retry_after_ms: Some(1500),
+            })),
+        },
+        Envelope {
+            request_id: 0,
+            last: false,
+            body: Some(Body::Welcome(Welcome {
+                device_list: Some(SignedDeviceList {
+                    body: vec![0xab; 8],
+                    signature: vec![0xcd; 4],
+                }),
+                ..Welcome::default()
+            })),
+        },
+    ];
+    for env in sent {
+        let decoded = Envelope::decode(env.encode_to_vec().as_slice()).unwrap();
+        let shown = format!("{decoded:?}");
+        assert!(!shown.contains("peer-secret"), "{shown}");
+        assert!(!shown.contains("171"), "{shown}"); // 0xab, as a number...
+        assert!(!shown.contains("abab"), "{shown}"); // ...or as hex
+        assert!(
+            shown.contains("message: <11 bytes>") || shown.contains("body: <8 bytes>"),
+            "{shown}"
+        );
+        // The rest stays visible: the retry hint and the (public) signature.
+        assert!(
+            shown.contains("retry_after_ms: Some(1500)")
+                || shown.contains("signature: [205, 205, 205, 205]"),
+            "{shown}"
+        );
+    }
+    // An unknown code shows its number; a known one its name.
+    let known = format!("{:?}", Error::new(ErrorCode::Invalid, "x"));
+    assert!(known.contains("Invalid"), "{known}");
+    let newer = Error {
+        code: 99,
+        message: String::new(),
+        retry_after_ms: None,
+    };
+    assert!(format!("{newer:?}").contains("Unknown(99)"));
+}
+
+#[test]
 fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     let newer = Error {
         code: 14,

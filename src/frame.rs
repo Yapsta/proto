@@ -99,6 +99,17 @@ impl Decoder for FrameCodec {
             .map(Some)
             .map_err(|_| FrameError::Invalid)
     }
+
+    /// The peer finished its stream: a clean end between frames is `None`, but
+    /// a cut-off prefix or body is the peer's malformed framing, `INVALID`, not
+    /// a lost transport (the other direction may still be open to say so).
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Envelope>, FrameError> {
+        match self.decode(src)? {
+            Some(env) => Ok(Some(env)),
+            None if src.is_empty() => Ok(None),
+            None => Err(FrameError::Invalid),
+        }
+    }
 }
 
 impl Encoder<&Envelope> for FrameCodec {
@@ -272,6 +283,38 @@ mod tests {
             }
         }
         assert!(reached_decode > 4_000, "{reached_decode}");
+    }
+
+    #[test]
+    fn a_frame_cut_off_at_eof_is_invalid() {
+        let mut whole = BytesMut::new();
+        FrameCodec::control().encode(ping(7), &mut whole).unwrap();
+        // A cut-off prefix, a prefix alone, and a cut-off body.
+        for cut in [2, 4, whole.len() - 1] {
+            let mut buf = BytesMut::from(&whole[..cut]);
+            let err = FrameCodec::control().decode_eof(&mut buf).unwrap_err();
+            assert!(matches!(err, FrameError::Invalid), "cut {cut}: {err}");
+            assert_eq!(err.code(), Some(ErrorCode::Invalid));
+        }
+        // A whole frame, then the start of another: the frame, then INVALID.
+        let mut codec = FrameCodec::control();
+        let mut buf = whole.clone();
+        buf.extend_from_slice(&whole[..2]);
+        assert_eq!(codec.decode_eof(&mut buf).unwrap(), Some(ping(7)));
+        assert!(matches!(
+            codec.decode_eof(&mut buf),
+            Err(FrameError::Invalid)
+        ));
+    }
+
+    #[test]
+    fn a_clean_eof_ends_the_stream() {
+        let mut codec = FrameCodec::control();
+        let mut buf = BytesMut::new();
+        codec.encode(ping(7), &mut buf).unwrap();
+        // The last whole frame still comes out, then the end.
+        assert_eq!(codec.decode_eof(&mut buf).unwrap(), Some(ping(7)));
+        assert_eq!(codec.decode_eof(&mut buf).unwrap(), None);
     }
 
     #[test]

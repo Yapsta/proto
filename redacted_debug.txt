@@ -1,5 +1,7 @@
 yapsta.v1.ClientInfo
+yapsta.v1.Error
 yapsta.v1.PresenceUpdate
 yapsta.v1.Resume
 yapsta.v1.SetPresence
+yapsta.v1.SignedDeviceList
 yapsta.v1.Welcome

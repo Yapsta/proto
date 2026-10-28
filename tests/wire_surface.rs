@@ -19,16 +19,16 @@ const COMMITTED: &str = include_str!("wire_surface.txt");
 /// Messages whose Debug is hand-written to redact them (build.rs, src/debug.rs).
 const REDACTED_DEBUG: &str = include_str!("../redacted_debug.txt");
 /// Text and bytes fields that are safe to print: keys, signatures, the
-/// challenge, ids and fixed server text.
+/// challenge and ids, public values whose size the receiver checks before use.
+/// Free text and signed bodies are redacted, whatever the sender is meant to
+/// put there.
 const PUBLIC_FIELDS: &[&str] = &[
     "yapsta.v1.DeviceCredential.account_pub",
     "yapsta.v1.DeviceCredential.device_pub",
     "yapsta.v1.DeviceCredential.signature",
     "yapsta.v1.DeviceEntry.device_pub",
-    "yapsta.v1.Error.message",
     "yapsta.v1.Hello.challenge",
     "yapsta.v1.Hello.server_id",
-    "yapsta.v1.SignedDeviceList.body",
     "yapsta.v1.SignedDeviceList.signature",
 ];
 
