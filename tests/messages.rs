@@ -201,7 +201,14 @@ fn every_message_round_trips_and_matches_its_golden_bytes() {
         reason = "a test-only switch to record new fixtures"
     )]
     if std::env::var_os("YAPSTA_BLESS").is_some() {
-        // New fixtures only: a committed fixture never changes.
+        // New fixtures only: a committed fixture never changes or goes away.
+        for line in GOLDEN.lines().filter(|l| !l.is_empty()) {
+            let name = line.split(' ').next().unwrap();
+            assert!(
+                examples.iter().any(|(e, _)| *e == name),
+                "the committed fixture {name} has no example any more"
+            );
+        }
         for (name, env) in &examples {
             if let Some(bytes) = golden(name) {
                 assert_eq!(hex(&env.encode_to_vec()), bytes, "{name} changed");
@@ -282,6 +289,19 @@ fn debug_output_redacts_secrets_and_user_text() {
         assert!(!env.contains(text), "{text} in {env}");
     }
     assert!(env.contains("<32 bytes>"), "{env}");
+    // A status from a newer peer shows its number.
+    let newer = PresenceUpdate {
+        account_id: 1,
+        status: 99,
+        custom_status: String::new(),
+    };
+    assert!(format!("{newer:?}").contains("Unknown(99)"));
+    let set = SetPresence {
+        status: None,
+        afk: None,
+        custom_status: Some("brb".to_owned()),
+    };
+    assert!(!format!("{set:?}").contains("brb"), "{set:?}");
 }
 
 #[test]

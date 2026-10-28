@@ -16,6 +16,21 @@ use prost_types::{DescriptorProto, EnumDescriptorProto, FileDescriptorSet};
 
 const DESCRIPTORS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/yapsta_v1.bin"));
 const COMMITTED: &str = include_str!("wire_surface.txt");
+/// Messages whose Debug is hand-written to redact them (build.rs, src/debug.rs).
+const REDACTED_DEBUG: &str = include_str!("../redacted_debug.txt");
+/// Text and bytes fields that are safe to print: keys, signatures, the
+/// challenge, ids and fixed server text.
+const PUBLIC_FIELDS: &[&str] = &[
+    "yapsta.v1.DeviceCredential.account_pub",
+    "yapsta.v1.DeviceCredential.device_pub",
+    "yapsta.v1.DeviceCredential.signature",
+    "yapsta.v1.DeviceEntry.device_pub",
+    "yapsta.v1.Error.message",
+    "yapsta.v1.Hello.challenge",
+    "yapsta.v1.Hello.server_id",
+    "yapsta.v1.SignedDeviceList.body",
+    "yapsta.v1.SignedDeviceList.signature",
+];
 
 fn enum_lines(name: &str, e: &EnumDescriptorProto, out: &mut Vec<String>) {
     for v in &e.value {
@@ -26,7 +41,7 @@ fn enum_lines(name: &str, e: &EnumDescriptorProto, out: &mut Vec<String>) {
         out.push(format!(
             "reserved {name} {}..{}",
             range.start(),
-            range.end() + 1
+            i64::from(range.end()) + 1
         ));
     }
     for reserved in &e.reserved_name {
@@ -97,27 +112,24 @@ fn current() -> Vec<String> {
 /// A field or enum value line that was retired: its number and its name are
 /// both reserved in `now`.
 fn retired(line: &str, now: &BTreeSet<&str>) -> bool {
-    let (path, number) = if let Some(rest) = line.strip_prefix("field ") {
-        let Some((path, tail)) = rest.split_once(" = ") else {
-            return false;
-        };
-        (path, tail.split(' ').next().unwrap_or_default())
-    } else if let Some(rest) = line.strip_prefix("enum ") {
-        let Some((path, number)) = rest.split_once(" = ") else {
-            return false;
-        };
-        (path, number)
-    } else {
+    let Some(rest) = line
+        .strip_prefix("field ")
+        .or_else(|| line.strip_prefix("enum "))
+    else {
         return false;
     };
+    let Some((path, tail)) = rest.split_once(" = ") else {
+        return false;
+    };
+    let number = tail.split(' ').next().unwrap_or_default();
     let (Some((owner, name)), Ok(number)) = (path.rsplit_once('.'), number.parse::<i32>()) else {
         return false;
     };
     let number_reserved = now.iter().any(|l| {
         l.strip_prefix(&format!("reserved {owner} "))
             .and_then(|r| r.split_once(".."))
-            .and_then(|(a, b)| Some((a.parse::<i32>().ok()?, b.parse::<i32>().ok()?)))
-            .is_some_and(|(a, b)| (a..b).contains(&number))
+            .and_then(|(a, b)| Some((a.parse::<i64>().ok()?, b.parse::<i64>().ok()?)))
+            .is_some_and(|(a, b)| (a..b).contains(&i64::from(number)))
     });
     number_reserved && now.contains(format!("reserved {owner} {name}").as_str())
 }
@@ -245,4 +257,68 @@ fn every_enum_starts_at_unspecified() {
             e.name()
         );
     }
+}
+
+#[test]
+fn every_text_field_is_redacted_or_public() {
+    let redacted: BTreeSet<&str> = REDACTED_DEBUG.lines().filter(|l| !l.is_empty()).collect();
+    let mut unclassified = Vec::new();
+    for line in current() {
+        let Some(rest) = line.strip_prefix("field ") else {
+            continue;
+        };
+        let (path, tail) = rest.split_once(" = ").unwrap();
+        let ty = tail.split(' ').nth(2).unwrap();
+        if ty != "string" && ty != "bytes" {
+            continue;
+        }
+        let (message, _) = path.rsplit_once('.').unwrap();
+        if !redacted.contains(message) && !PUBLIC_FIELDS.contains(&path) {
+            unclassified.push(path.to_owned());
+        }
+    }
+    assert!(
+        unclassified.is_empty(),
+        "text fields that a {{:?}} would print; redact their message \
+         (redacted_debug.txt + src/debug.rs) or list them in PUBLIC_FIELDS:\n  {}",
+        unclassified.join("\n  ")
+    );
+}
+
+#[test]
+fn nested_enums_and_enum_reservations_are_listed() {
+    use prost_types::EnumValueDescriptorProto;
+    use prost_types::enum_descriptor_proto::EnumReservedRange;
+
+    let kind = EnumDescriptorProto {
+        name: Some("Kind".to_owned()),
+        value: vec![EnumValueDescriptorProto {
+            name: Some("KIND_UNSPECIFIED".to_owned()),
+            number: Some(0),
+            ..Default::default()
+        }],
+        reserved_range: vec![EnumReservedRange {
+            start: Some(3),
+            end: Some(3),
+        }],
+        reserved_name: vec!["KIND_OLD".to_owned()],
+        ..Default::default()
+    };
+    let msg = DescriptorProto {
+        name: Some("Channel".to_owned()),
+        enum_type: vec![kind],
+        ..Default::default()
+    };
+    let mut lines = Vec::new();
+    message_lines("yapsta.v1.Channel", &msg, &mut lines);
+    assert_eq!(
+        lines,
+        [
+            "message yapsta.v1.Channel",
+            "enum yapsta.v1.Channel.Kind.KIND_UNSPECIFIED = 0",
+            // Inclusive 3..=3, written half-open like message ranges.
+            "reserved yapsta.v1.Channel.Kind 3..4",
+            "reserved yapsta.v1.Channel.Kind KIND_OLD",
+        ]
+    );
 }

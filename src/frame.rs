@@ -248,20 +248,30 @@ mod tests {
             state ^= state << 17;
             state
         };
+        let mut reached_decode = 0;
         for _ in 0..5_000 {
             let mut codec = FrameCodec::with_limit(256);
-            let len = (next() % 300) as usize;
-            let bytes: Vec<u8> = (0..len).map(|_| next() as u8).collect();
+            // Mostly a prefix within the limit, so the body reaches
+            // `Envelope::decode`; one in ten is random.
+            let len = (next() % 257) as u32;
+            let prefix = if next() % 10 == 0 { next() as u32 } else { len };
+            let mut bytes = prefix.to_be_bytes().to_vec();
+            bytes.extend((0..len).map(|_| next() as u8));
             let mut buf = BytesMut::new();
             for chunk in bytes.chunks((next() % 17 + 1) as usize) {
                 buf.put_slice(chunk);
                 match codec.decode(&mut buf) {
-                    Ok(_) => {}
-                    Err(FrameError::TooLarge { .. } | FrameError::Invalid) => break,
+                    Ok(None) => {}
+                    Ok(Some(_)) | Err(FrameError::Invalid) => {
+                        reached_decode += 1;
+                        break;
+                    }
+                    Err(FrameError::TooLarge { .. }) => break,
                     Err(e) => panic!("unexpected {e}"),
                 }
             }
         }
+        assert!(reached_decode > 4_000, "{reached_decode}");
     }
 
     #[test]

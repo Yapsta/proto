@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=proto");
+    println!("cargo:rerun-if-changed=redacted_debug.txt");
     let files = protox::compile(["yapsta/v1/yapsta.proto"], ["proto"])?;
     #[allow(
         clippy::disallowed_methods,
@@ -16,16 +17,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         out.join("yapsta_v1.bin"),
         prost::Message::encode_to_vec(&files),
     )?;
+    // Messages with a secret or user text get hand-written, redacting Debug
+    // impls (src/debug.rs), so a stray `{:?}` cannot log them. The list is
+    // shared with tests/wire_surface.rs, which classifies every text field.
+    let redacted = include_str!("redacted_debug.txt")
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| format!(".{l}"));
     prost_build::Config::new()
-        // Secrets and user text: hand-written Debug impls redact them
-        // (src/debug.rs), so a stray `{:?}` cannot log them.
-        .skip_debug([
-            ".yapsta.v1.Resume",
-            ".yapsta.v1.Welcome",
-            ".yapsta.v1.ClientInfo",
-            ".yapsta.v1.PresenceUpdate",
-            ".yapsta.v1.SetPresence",
-        ])
+        .skip_debug(redacted)
         .compile_fds(files)?;
     Ok(())
 }
