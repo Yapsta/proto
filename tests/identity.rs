@@ -366,6 +366,15 @@ fn an_oversized_body_is_refused_before_it_is_verified() {
         verify_device_list(&account.public(), &over, NOW),
         Err(IdentityError::ListLimit)
     );
+    // Before the signature: a garbage signature still gets the size error.
+    let unsigned = SignedDeviceList {
+        body: vec![0; MAX_DEVICE_LIST_BODY + 1],
+        signature: vec![0; 64],
+    };
+    assert_eq!(
+        verify_device_list(&account.public(), &unsigned, NOW),
+        Err(IdentityError::ListLimit)
+    );
 }
 
 #[test]
@@ -537,6 +546,10 @@ fn a_small_order_r_is_refused() {
         device_pub: &device_pub,
     };
     let device_signing = hand_derived(b"yapsta/device/v1", secret.as_bytes());
+    assert_eq!(
+        device_signing.verifying_key().to_bytes(),
+        device_pub.to_bytes()
+    );
     let forged = forge_small_order_r(&device_signing, &transcript.to_bytes());
     assert_eq!(transcript.verify(&forged), Err(IdentityError::BadSignature));
 }
