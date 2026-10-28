@@ -7,7 +7,7 @@
 use prost::Message;
 use yapsta_proto::v1::envelope::Body;
 use yapsta_proto::v1::*;
-use yapsta_proto::{MINOR_VERSION, WireCode};
+use yapsta_proto::{ALPN, MINOR_VERSION, WireCode};
 
 const GOLDEN: &str = include_str!("golden.txt");
 
@@ -69,7 +69,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                     server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
                     versions: vec![MINOR_VERSION],
                     challenge: vec![1; 32],
-                    capabilities: vec![],
+                    capabilities: vec![Capability::Unspecified.into()],
                     space_public_info: Some(SpacePublicInfo {}),
                 }),
             ),
@@ -180,29 +180,56 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn unhex(hex: &str) -> Vec<u8> {
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+        .collect()
+}
+
+fn golden(name: &str) -> Option<&'static str> {
+    GOLDEN
+        .lines()
+        .find_map(|l| l.strip_prefix(name)?.strip_prefix(' '))
+}
+
 #[test]
 fn every_message_round_trips_and_matches_its_golden_bytes() {
-    let current: Vec<String> = examples()
-        .iter()
-        .map(|(name, env)| format!("{name} {}", hex(&env.encode_to_vec())))
-        .collect();
+    let examples = examples();
     #[allow(
         clippy::disallowed_methods,
-        reason = "a test-only switch to rewrite the fixtures"
+        reason = "a test-only switch to record new fixtures"
     )]
     if std::env::var_os("YAPSTA_BLESS").is_some() {
+        // New fixtures only: a committed fixture never changes.
+        for (name, env) in &examples {
+            if let Some(bytes) = golden(name) {
+                assert_eq!(hex(&env.encode_to_vec()), bytes, "{name} changed");
+            }
+        }
+        let lines: Vec<String> = examples
+            .iter()
+            .map(|(name, env)| format!("{name} {}", hex(&env.encode_to_vec())))
+            .collect();
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden.txt");
-        std::fs::write(path, current.join("\n") + "\n").unwrap();
+        std::fs::write(path, lines.join("\n") + "\n").unwrap();
         return;
     }
-    for (name, env) in examples() {
-        let bytes = env.encode_to_vec();
-        assert_eq!(Envelope::decode(bytes.as_slice()).unwrap(), env, "{name}");
-        let golden = GOLDEN
-            .lines()
-            .find_map(|l| l.strip_prefix(&format!("{name} ")))
-            .unwrap_or_else(|| panic!("no golden bytes for {name}; YAPSTA_BLESS=1"));
-        assert_eq!(hex(&bytes), golden, "{name}: the wire bytes changed");
+    for (name, env) in examples {
+        let bytes =
+            golden(name).unwrap_or_else(|| panic!("no golden bytes for {name}; YAPSTA_BLESS=1"));
+        // The fixtures are a decode contract for the client and bot repos...
+        assert_eq!(
+            Envelope::decode(unhex(bytes).as_slice()).unwrap(),
+            env,
+            "{name}: decode"
+        );
+        // ...and today's encoder still produces them.
+        assert_eq!(
+            hex(&env.encode_to_vec()),
+            bytes,
+            "{name}: the wire bytes changed"
+        );
     }
 }
 
@@ -222,6 +249,42 @@ fn an_unknown_body_variant_decodes_to_none() {
 }
 
 #[test]
+fn unknown_variants_inside_messages_decode_to_none() {
+    // A newer peer's variant: field 99, length-delimited, 0 bytes.
+    let unknown = [0x9a, 0x06, 0x00];
+    let event = Event::decode([&[0x08, 0x05][..], &unknown].concat().as_slice()).unwrap();
+    assert_eq!((event.seq, event.kind), (5, None));
+    assert_eq!(Ephemeral::decode(&unknown[..]).unwrap().kind, None);
+    let auth = Auth::decode([&[0x08, 0x01][..], &unknown].concat().as_slice()).unwrap();
+    assert_eq!((auth.version, auth.credential), (1, None));
+    assert_eq!(Welcome::decode(&unknown[..]).unwrap().state, None);
+}
+
+#[test]
+fn the_constants() {
+    assert_eq!(ALPN, b"yapsta/1");
+    assert_eq!(MINOR_VERSION, 1);
+    assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
+    assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
+}
+
+#[test]
+fn debug_output_redacts_secrets_and_user_text() {
+    let env = examples()
+        .into_iter()
+        .map(|(_, env)| format!("{env:?}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    // The resume tokens (4s and 5s) and the user text never appear.
+    assert!(!env.contains("[4, 4, 4"), "{env}");
+    assert!(!env.contains("[5, 5, 5"), "{env}");
+    for text in ["yapsta-cli", "0.1.0", "away"] {
+        assert!(!env.contains(text), "{text} in {env}");
+    }
+    assert!(env.contains("<32 bytes>"), "{env}");
+}
+
+#[test]
 fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     let newer = Error {
         code: 14,
@@ -232,6 +295,15 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     assert!(!WireCode::of_error(&newer).is_normal_close());
     assert_eq!(WireCode::of_close(14), WireCode::Unknown(14));
     assert_eq!(WireCode::of_close(u64::MAX), WireCode::Unknown(i64::MAX));
+    // Above 32 bits: never truncated into a known code (or a normal close).
+    assert_eq!(WireCode::of_close(1 << 32), WireCode::Unknown(1 << 32));
+    assert!(!WireCode::of_close(1 << 32).is_normal_close());
+    let negative = Error {
+        code: -1,
+        message: String::new(),
+        retry_after_ms: None,
+    };
+    assert_eq!(WireCode::of_error(&negative), WireCode::Unknown(-1));
 
     assert!(WireCode::of_close(0).is_normal_close());
     for code in [ErrorCode::SlowConsumer, ErrorCode::SessionReplaced] {

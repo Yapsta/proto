@@ -11,7 +11,9 @@ use crate::v1::{Envelope, ErrorCode};
 use crate::{MAX_CONTROL_FRAME, MAX_REQUEST_FRAME};
 
 const PREFIX: usize = 4;
-/// At most this much is reserved ahead of the bytes received.
+/// The most the decoder asks to reserve ahead of the bytes received. `BytesMut`
+/// may round a reservation up, so the buffer stays within about twice the bytes
+/// received plus this step: it grows with what arrives, never with a claim.
 const RESERVE_STEP: usize = 64 * 1024;
 
 #[derive(Debug, thiserror::Error)]
@@ -27,12 +29,14 @@ pub enum FrameError {
 }
 
 impl FrameError {
-    /// The code to close the stream or connection with (§ 6.1).
-    pub fn code(&self) -> ErrorCode {
+    /// The code to close the stream or connection with (§ 6.1), or `None` for
+    /// an I/O error: the transport is gone and there is nothing to send. Never
+    /// close with code 0 (a normal close) for an error, or the peer won't resume.
+    pub fn code(&self) -> Option<ErrorCode> {
         match self {
-            Self::TooLarge { .. } => ErrorCode::TooLarge,
-            Self::Invalid => ErrorCode::Invalid,
-            Self::Io(_) => ErrorCode::Unspecified,
+            Self::TooLarge { .. } => Some(ErrorCode::TooLarge),
+            Self::Invalid => Some(ErrorCode::Invalid),
+            Self::Io(_) => None,
         }
     }
 }
@@ -54,13 +58,12 @@ impl FrameCodec {
         Self::with_limit(MAX_REQUEST_FRAME)
     }
 
-    /// Frames of at most `max` bytes (the prefix not counted).
+    /// Frames of at most `max` bytes (the prefix not counted), capped at
+    /// `u32::MAX`, the largest length the prefix can carry.
     pub fn with_limit(max: usize) -> Self {
-        Self { max }
-    }
-
-    pub fn limit(&self) -> usize {
-        self.max
+        Self {
+            max: max.min(u32::MAX as usize),
+        }
     }
 }
 
@@ -68,6 +71,10 @@ impl Decoder for FrameCodec {
     type Item = Envelope;
     type Error = FrameError;
 
+    /// A complete frame, or `None` until one has arrived. A body variant this
+    /// version doesn't know (a newer peer's) decodes to `body: None`, and so do
+    /// unknown `kind`/`credential`/`state` variants inside: callers answer
+    /// `INVALID` or ignore them (§ 6.1), and never `unwrap()` them.
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Envelope>, FrameError> {
         let Some(prefix) = src.get(..PREFIX) else {
             return Ok(None);
@@ -106,7 +113,7 @@ impl Encoder<&Envelope> for FrameCodec {
             });
         }
         dst.reserve(PREFIX + len);
-        // `len` fits: limits are far below u32::MAX.
+        // `len` fits: the limit is at most u32::MAX (`with_limit`).
         dst.put_u32(len as u32);
         item.encode(dst).map_err(|_| FrameError::Invalid)
     }
@@ -166,7 +173,7 @@ mod tests {
             let cap = buf.capacity();
             let err = codec.decode(&mut buf).unwrap_err();
             assert!(matches!(err, FrameError::TooLarge { .. }), "{err}");
-            assert_eq!(err.code(), ErrorCode::TooLarge);
+            assert_eq!(err.code(), Some(ErrorCode::TooLarge));
             assert_eq!(buf.capacity(), cap, "reserved for a refused frame");
         }
     }
@@ -202,18 +209,78 @@ mod tests {
         buf.put_slice(&[0xff, 0xff, 0xff]);
         let err = codec.decode(&mut buf).unwrap_err();
         assert!(matches!(err, FrameError::Invalid));
-        assert_eq!(err.code(), ErrorCode::Invalid);
+        assert_eq!(err.code(), Some(ErrorCode::Invalid));
+    }
+
+    #[test]
+    fn coalesced_frames_come_out_one_at_a_time() {
+        let mut codec = FrameCodec::control();
+        let mut buf = BytesMut::new();
+        codec.encode(ping(1), &mut buf).unwrap();
+        codec.encode(ping(2), &mut buf).unwrap();
+        buf.put_slice(&[0, 0]); // the start of a third prefix
+        assert_eq!(codec.decode(&mut buf).unwrap(), Some(ping(1)));
+        assert_eq!(codec.decode(&mut buf).unwrap(), Some(ping(2)));
+        assert_eq!(codec.decode(&mut buf).unwrap(), None);
+        assert_eq!(&buf[..], &[0, 0]);
+    }
+
+    #[test]
+    fn the_encoder_limit_is_inclusive() {
+        let len = ping(7).encoded_len();
+        let mut buf = BytesMut::new();
+        FrameCodec::with_limit(len)
+            .encode(ping(7), &mut buf)
+            .unwrap();
+        assert!(matches!(
+            FrameCodec::with_limit(len - 1).encode(ping(7), &mut BytesMut::new()),
+            Err(FrameError::TooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn random_input_never_panics() {
+        // Deterministic xorshift: no fuzzing dependency, same inputs every run.
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for _ in 0..5_000 {
+            let mut codec = FrameCodec::with_limit(256);
+            let len = (next() % 300) as usize;
+            let bytes: Vec<u8> = (0..len).map(|_| next() as u8).collect();
+            let mut buf = BytesMut::new();
+            for chunk in bytes.chunks((next() % 17 + 1) as usize) {
+                buf.put_slice(chunk);
+                match codec.decode(&mut buf) {
+                    Ok(_) => {}
+                    Err(FrameError::TooLarge { .. } | FrameError::Invalid) => break,
+                    Err(e) => panic!("unexpected {e}"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_io_error_has_no_close_code() {
+        let err = FrameError::Io(std::io::ErrorKind::ConnectionReset.into());
+        assert_eq!(err.code(), None);
+    }
+
+    #[test]
+    fn a_limit_above_the_prefix_range_is_capped() {
+        let codec = FrameCodec::with_limit(usize::MAX);
+        assert_eq!(codec.max, u32::MAX as usize);
     }
 
     #[test]
     fn the_encoder_refuses_an_oversize_frame() {
         let mut codec = FrameCodec::with_limit(4);
         let mut buf = BytesMut::new();
-        let big = Envelope {
-            request_id: u32::MAX,
-            last: true,
-            body: Some(Body::Ping(Ping {})),
-        };
+        let big = ping(u32::MAX);
         assert!(matches!(
             codec.encode(&big, &mut buf),
             Err(FrameError::TooLarge { .. })

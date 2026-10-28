@@ -4,6 +4,7 @@
 //!
 //! The wire surface is add-only (§ 6.7); `tests/wire_surface.rs` enforces it.
 
+mod debug;
 pub mod frame;
 
 /// The generated messages of `proto/yapsta/v1/yapsta.proto`.

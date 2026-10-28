@@ -16,6 +16,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         out.join("yapsta_v1.bin"),
         prost::Message::encode_to_vec(&files),
     )?;
-    prost_build::Config::new().compile_fds(files)?;
+    prost_build::Config::new()
+        // Secrets and user text: hand-written Debug impls redact them
+        // (src/debug.rs), so a stray `{:?}` cannot log them.
+        .skip_debug([
+            ".yapsta.v1.Resume",
+            ".yapsta.v1.Welcome",
+            ".yapsta.v1.ClientInfo",
+            ".yapsta.v1.PresenceUpdate",
+            ".yapsta.v1.SetPresence",
+        ])
+        .compile_fds(files)?;
     Ok(())
 }
