@@ -58,9 +58,10 @@ message Error {
   // parsed by clients.
   string message = 2;
   optional uint64 retry_after_ms = 3;
-  // With DEVICE_NOT_LISTED or CONFLICT only: the stored device list, sent
-  // when the list the client presented verified under its account key (§ 6.2),
-  // so a seed device restored from its phrase can merge it and sign the next
+  // With DEVICE_NOT_LISTED, DEVICE_EXPIRED or CONFLICT only: the stored
+  // device list, sent when the list the client presented verified under its
+  // account key (§ 6.2), so a seed device (restored from its phrase, or one
+  // whose entry expired in a newer list) can merge it and sign the next
   // version.
   optional SignedDeviceList device_list = 4;
 }
