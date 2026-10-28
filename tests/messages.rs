@@ -315,6 +315,11 @@ fn debug_output_redacts_peer_filled_fields_after_decoding() {
                 code: 99,
                 message: "peer-secret".to_owned(),
                 retry_after_ms: Some(1500),
+                // Redacted inside an Error too.
+                device_list: Some(SignedDeviceList {
+                    body: vec![0xab; 8],
+                    signature: vec![0xcd; 4],
+                }),
             })),
         },
         Envelope {
@@ -353,6 +358,7 @@ fn debug_output_redacts_peer_filled_fields_after_decoding() {
         code: 99,
         message: String::new(),
         retry_after_ms: None,
+        device_list: None,
     };
     assert!(format!("{newer:?}").contains("Unknown(99)"));
 }
@@ -363,6 +369,7 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
         code: 14,
         message: String::new(),
         retry_after_ms: None,
+        device_list: None,
     };
     assert_eq!(WireCode::of_error(&newer), WireCode::Unknown(14));
     assert!(!WireCode::of_error(&newer).is_normal_close());
@@ -375,6 +382,7 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
         code: -1,
         message: String::new(),
         retry_after_ms: None,
+        device_list: None,
     };
     assert_eq!(WireCode::of_error(&negative), WireCode::Unknown(-1));
 
@@ -385,6 +393,7 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
             code: code.into(),
             message: String::new(),
             retry_after_ms: None,
+            device_list: None,
         };
         assert_eq!(WireCode::of_error(&error), WireCode::Known(code));
     }

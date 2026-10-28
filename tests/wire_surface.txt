@@ -48,6 +48,7 @@ field yapsta.v1.Envelope.set_presence = 9 singular .yapsta.v1.SetPresence oneof 
 field yapsta.v1.Envelope.welcome = 6 singular .yapsta.v1.Welcome oneof body
 field yapsta.v1.Ephemeral.presence_update = 1 singular .yapsta.v1.PresenceUpdate oneof kind
 field yapsta.v1.Error.code = 1 singular .yapsta.v1.ErrorCode
+field yapsta.v1.Error.device_list = 4 optional .yapsta.v1.SignedDeviceList
 field yapsta.v1.Error.message = 2 singular string
 field yapsta.v1.Error.retry_after_ms = 3 optional uint64
 field yapsta.v1.Event.member_joined = 2 singular .yapsta.v1.MemberJoined oneof kind
