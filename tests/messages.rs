@@ -54,9 +54,8 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 5,
                 true,
                 Body::Error(Error {
-                    code: ErrorCode::RateLimited.into(),
-                    message: "slow down".to_owned(),
                     retry_after_ms: Some(1500),
+                    ..Error::new(ErrorCode::RateLimited, "slow down")
                 }),
             ),
         ),
@@ -196,19 +195,20 @@ fn golden(name: &str) -> Option<&'static str> {
 #[test]
 fn every_message_round_trips_and_matches_its_golden_bytes() {
     let examples = examples();
+    // A committed fixture never goes away: every one keeps its example.
+    for line in GOLDEN.lines().filter(|l| !l.is_empty()) {
+        let name = line.split(' ').next().unwrap();
+        assert!(
+            examples.iter().any(|(e, _)| *e == name),
+            "the committed fixture {name} has no example any more"
+        );
+    }
     #[allow(
         clippy::disallowed_methods,
         reason = "a test-only switch to record new fixtures"
     )]
     if std::env::var_os("YAPSTA_BLESS").is_some() {
-        // New fixtures only: a committed fixture never changes or goes away.
-        for line in GOLDEN.lines().filter(|l| !l.is_empty()) {
-            let name = line.split(' ').next().unwrap();
-            assert!(
-                examples.iter().any(|(e, _)| *e == name),
-                "the committed fixture {name} has no example any more"
-            );
-        }
+        // New fixtures only: a committed fixture never changes.
         for (name, env) in &examples {
             if let Some(bytes) = golden(name) {
                 assert_eq!(hex(&env.encode_to_vec()), bytes, "{name} changed");

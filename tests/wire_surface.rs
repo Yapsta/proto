@@ -218,6 +218,16 @@ fn the_retirement_rule() {
             ]),
             false,
         ),
+        // Reserved just below: the range end is exclusive.
+        (
+            set(&[
+                "reserved yapsta.v1.M 1..2",
+                "reserved yapsta.v1.M old",
+                "reserved yapsta.v1.E 2..3",
+                "reserved yapsta.v1.E E_OLD",
+            ]),
+            false,
+        ),
         // Renumbered rather than retired.
         (
             set(&[
@@ -297,10 +307,16 @@ fn nested_enums_and_enum_reservations_are_listed() {
             number: Some(0),
             ..Default::default()
         }],
-        reserved_range: vec![EnumReservedRange {
-            start: Some(3),
-            end: Some(3),
-        }],
+        reserved_range: vec![
+            EnumReservedRange {
+                start: Some(3),
+                end: Some(3),
+            },
+            EnumReservedRange {
+                start: Some(5),
+                end: Some(i32::MAX),
+            },
+        ],
         reserved_name: vec!["KIND_OLD".to_owned()],
         ..Default::default()
     };
@@ -318,7 +334,54 @@ fn nested_enums_and_enum_reservations_are_listed() {
             "enum yapsta.v1.Channel.Kind.KIND_UNSPECIFIED = 0",
             // Inclusive 3..=3, written half-open like message ranges.
             "reserved yapsta.v1.Channel.Kind 3..4",
+            "reserved yapsta.v1.Channel.Kind 5..2147483648",
             "reserved yapsta.v1.Channel.Kind KIND_OLD",
         ]
     );
+}
+
+#[test]
+fn the_redaction_lists_name_real_messages_and_fields() {
+    let set = descriptors();
+    let mut messages = Vec::new();
+    fn walk<'a>(
+        name: String,
+        msg: &'a DescriptorProto,
+        out: &mut Vec<(String, &'a DescriptorProto)>,
+    ) {
+        for nested in &msg.nested_type {
+            walk(format!("{name}.{}", nested.name()), nested, out);
+        }
+        out.push((name, msg));
+    }
+    for file in &set.file {
+        for msg in &file.message_type {
+            walk(
+                format!("{}.{}", file.package(), msg.name()),
+                msg,
+                &mut messages,
+            );
+        }
+    }
+    for listed in REDACTED_DEBUG.lines().filter(|l| !l.is_empty()) {
+        let (_, msg) = messages
+            .iter()
+            .find(|(name, _)| name == listed)
+            .unwrap_or_else(|| panic!("redacted_debug.txt names {listed}, which does not exist"));
+        // prost generates no type for a map entry, so skip_debug would not
+        // redact it: redact the message that holds the map instead.
+        assert!(
+            !msg.options.as_ref().is_some_and(|o| o.map_entry()),
+            "{listed} is a map entry; redact its parent message"
+        );
+    }
+    for public in PUBLIC_FIELDS {
+        let (owner, field) = public.rsplit_once('.').unwrap();
+        assert!(
+            messages
+                .iter()
+                .any(|(name, msg)| name == owner && msg.field.iter().any(|f| f.name() == field)),
+            "PUBLIC_FIELDS names {public}, which does not exist"
+        );
+    }
 }

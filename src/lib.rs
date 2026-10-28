@@ -66,3 +66,15 @@ impl v1::ErrorCode {
         self as i32 as u64
     }
 }
+
+impl v1::Error {
+    /// An `Error` frame. The message is fixed server text (`&'static str`):
+    /// never user content (§ 6.1), so it can't leak through logs or `Debug`.
+    pub fn new(code: v1::ErrorCode, message: &'static str) -> Self {
+        Self {
+            code: code.into(),
+            message: message.to_owned(),
+            retry_after_ms: None,
+        }
+    }
+}
