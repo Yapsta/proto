@@ -6,6 +6,7 @@
 
 mod debug;
 pub mod frame;
+pub mod identity;
 
 /// The generated messages of `proto/yapsta/v1/yapsta.proto`.
 pub mod v1 {
