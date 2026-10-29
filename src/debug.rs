@@ -1,6 +1,7 @@
-//! `Debug` for the messages that carry a secret (resume tokens), user text
-//! (client info, custom status) or other bytes a peer fills freely (error text,
-//! signed device-list bodies): the shape and lengths only. ARCHITECTURE § 6.2
+//! `Debug` for the messages that carry a secret (resume tokens, redeem codes,
+//! channel passwords), user text (client info, custom status, names, profiles)
+//! or other bytes a peer fills freely (error text, signed device-list bodies,
+//! blobs): the shape and lengths only. ARCHITECTURE § 6.2
 //! and § 6.3 say these are never logged; this keeps a stray `{:?}` from doing so.
 //!
 //! The messages are listed in `redacted_debug.txt` (read by build.rs), and
@@ -9,10 +10,14 @@
 //! field is a compile error here rather than a silent omission.
 
 use std::fmt;
+use std::marker::PhantomData;
 
 use crate::v1::{
-    ClientInfo, Error, ErrorCode, PresenceStatus, PresenceUpdate, Resume, SetPresence,
-    SignedDeviceList, Welcome, welcome,
+    BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateRole, Error, ErrorCode,
+    InviteCreated, Member, PresenceStatus, PresenceUpdate, Redeem, Resume, Role,
+    SetChannelPassword, SetNickname, SetPresence, SignedDeviceList, Space, SpacePublicInfo,
+    UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace, UploadImageRequest, Welcome, redeem,
+    welcome,
 };
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -28,28 +33,41 @@ fn redacted<T: AsRef<[u8]>>(value: &Option<T>) -> Option<Redacted> {
     value.as_ref().map(|v| Redacted(v.as_ref().len()))
 }
 
-/// A status as received: a value from a newer peer shows as its number.
-struct Status(i32);
+/// An enum value as received: a value from a newer peer shows as its number.
+struct Enum<E>(i32, PhantomData<E>);
 
-impl fmt::Debug for Status {
+fn known<E>(value: i32) -> Enum<E> {
+    Enum(value, PhantomData)
+}
+
+impl<E: TryFrom<i32> + fmt::Debug> fmt::Debug for Enum<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match PresenceStatus::try_from(self.0) {
-            Ok(status) => status.fmt(f),
+        match E::try_from(self.0) {
+            Ok(value) => value.fmt(f),
             Err(_) => write!(f, "Unknown({})", self.0),
         }
     }
 }
 
-/// An error code as received: a value from a newer peer shows as its number.
-struct Code(i32);
-
-impl fmt::Debug for Code {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match ErrorCode::try_from(self.0) {
-            Ok(code) => code.fmt(f),
-            Err(_) => write!(f, "Unknown({})", self.0),
+/// `Debug` for a message, naming every field (no `..`, so a new field is a
+/// compile error here): `text` shows a string or bytes field's length only,
+/// `opt_text` the same for an optional one, `kind` a `ChannelKind`, and a
+/// bare field prints as it is.
+macro_rules! redacting_debug {
+    ($message:ident { $($field:ident $(: $how:ident)?),* $(,)? }) => {
+        impl fmt::Debug for $message {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let Self { $($field),* } = self;
+                f.debug_struct(stringify!($message))
+                    $(.field(stringify!($field), &redacting_debug!(@show $field $($how)?)))*
+                    .finish()
+            }
         }
-    }
+    };
+    (@show $field:ident) => { $field };
+    (@show $field:ident text) => { Redacted($field.len()) };
+    (@show $field:ident opt_text) => { redacted($field) };
+    (@show $field:ident kind) => { known::<ChannelKind>(*$field) };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -63,7 +81,7 @@ impl fmt::Debug for Error {
             device_list,
         } = self;
         f.debug_struct("Error")
-            .field("code", &Code(*code))
+            .field("code", &known::<ErrorCode>(*code))
             .field("message", &Redacted(message.len()))
             .field("retry_after_ms", retry_after_ms)
             .field("device_list", device_list)
@@ -140,7 +158,7 @@ impl fmt::Debug for PresenceUpdate {
         } = self;
         f.debug_struct("PresenceUpdate")
             .field("account_id", account_id)
-            .field("status", &Status(*status))
+            .field("status", &known::<PresenceStatus>(*status))
             .field("custom_status", &Redacted(custom_status.len()))
             .finish()
     }
@@ -154,9 +172,134 @@ impl fmt::Debug for SetPresence {
             custom_status,
         } = self;
         f.debug_struct("SetPresence")
-            .field("status", &status.map(Status))
+            .field("status", &status.map(known::<PresenceStatus>))
             .field("afk", afk)
             .field("custom_status", &redacted(custom_status))
             .finish()
+    }
+}
+
+// M2 (§ 6.8): names, profiles and blobs are user content; redeem codes,
+// invite codes and channel passwords are secrets.
+
+redacting_debug!(SpacePublicInfo {
+    name: text,
+    description: text,
+    rules: text,
+    icon_id,
+    claimed
+});
+redacting_debug!(Space {
+    owner_account_id,
+    name: text,
+    description: text,
+    rules: text,
+    icon_id
+});
+redacting_debug!(Channel {
+    id,
+    kind: kind,
+    parent_id,
+    position,
+    name: text,
+    topic: text,
+    slowmode_secs,
+    max_members,
+    has_password,
+    age_restricted,
+    needed_talk_power,
+    max_bitrate,
+    overwrites,
+});
+redacting_debug!(Role {
+    id,
+    name: text,
+    color,
+    position,
+    hoist,
+    permissions,
+    talk_power
+});
+redacting_debug!(Member {
+    account_id,
+    joined_at,
+    nickname: opt_text,
+    role_ids,
+    display_name: text,
+    avatar_id,
+    bio: text,
+    pronouns: text,
+});
+redacting_debug!(BlobData {
+    blob_id,
+    media_type: text,
+    data: text
+});
+redacting_debug!(UpdateSpace {
+    name: opt_text,
+    description: opt_text,
+    rules: opt_text
+});
+redacting_debug!(CreateChannel {
+    kind: kind,
+    parent_id,
+    position,
+    name: text,
+    topic: opt_text,
+    slowmode_secs,
+    max_members,
+    age_restricted,
+    needed_talk_power,
+    max_bitrate,
+});
+redacting_debug!(UpdateChannel {
+    channel_id,
+    name: opt_text,
+    topic: opt_text,
+    slowmode_secs,
+    max_members,
+    age_restricted,
+    needed_talk_power,
+    max_bitrate,
+});
+redacting_debug!(SetChannelPassword {
+    channel_id,
+    password: opt_text
+});
+redacting_debug!(CreateRole {
+    name: text,
+    color,
+    hoist,
+    permissions,
+    talk_power
+});
+redacting_debug!(UpdateRole {
+    role_id,
+    name: opt_text,
+    color,
+    hoist,
+    permissions,
+    talk_power
+});
+redacting_debug!(UpdateProfile {
+    display_name: opt_text,
+    bio: opt_text,
+    pronouns: opt_text
+});
+redacting_debug!(SetNickname {
+    account_id,
+    nickname: opt_text
+});
+redacting_debug!(InviteCreated { invite, code: text });
+redacting_debug!(UploadImageRequest { data: text });
+redacting_debug!(Redeem { code });
+
+impl fmt::Debug for redeem::Code {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (name, code) = match self {
+            Self::ClaimCode(code) => ("ClaimCode", code),
+            Self::InviteCode(code) => ("InviteCode", code),
+        };
+        f.debug_tuple(name).field(&Redacted(code.len())).finish()
     }
 }

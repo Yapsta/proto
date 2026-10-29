@@ -205,10 +205,11 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.put_u32(64);
         // 64 bytes of field 1 (request_id) varints is not valid padding, so use
-        // an unknown field: tag 15 length-delimited, 62 bytes of payload.
-        buf.put_u8((15 << 3) | 2);
-        buf.put_u8(62);
-        buf.put_bytes(0, 62);
+        // an unknown field: tag 99 length-delimited (a two-byte key), 61 bytes
+        // of payload.
+        buf.put_slice(&[0x9a, 0x06]);
+        buf.put_u8(61);
+        buf.put_bytes(0, 61);
         assert_eq!(codec.decode(&mut buf).unwrap(), Some(Envelope::default()));
     }
 
