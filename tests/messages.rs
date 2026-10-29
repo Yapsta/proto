@@ -819,3 +819,70 @@ fn permission_values_are_their_bits() {
     }
     assert!(Permission::try_from(42).is_err());
 }
+
+#[test]
+fn debug_output_redacts_every_patch_command() {
+    let shown = [
+        format!(
+            "{:?}",
+            UpdateSpace {
+                name: Some("patch-text".to_owned()),
+                description: Some("patch-text".to_owned()),
+                rules: Some("patch-text".to_owned()),
+            }
+        ),
+        format!(
+            "{:?}",
+            UpdateChannel {
+                channel_id: 5,
+                name: Some("patch-text".to_owned()),
+                topic: Some("patch-text".to_owned()),
+                ..UpdateChannel::default()
+            }
+        ),
+        format!(
+            "{:?}",
+            CreateRole {
+                name: "patch-text".to_owned(),
+                ..CreateRole::default()
+            }
+        ),
+        format!(
+            "{:?}",
+            UpdateRole {
+                role_id: 2,
+                name: Some("patch-text".to_owned()),
+                ..UpdateRole::default()
+            }
+        ),
+        format!(
+            "{:?}",
+            UpdateProfile {
+                display_name: Some("patch-text".to_owned()),
+                bio: Some("patch-text".to_owned()),
+                pronouns: Some("patch-text".to_owned()),
+            }
+        ),
+        format!(
+            "{:?}",
+            SetNickname {
+                account_id: 43,
+                nickname: Some("patch-text".to_owned()),
+            }
+        ),
+        format!(
+            "{:?}",
+            UploadImageRequest {
+                data: vec![0xab; 6],
+            }
+        ),
+    ];
+    for shown in &shown {
+        assert!(!shown.contains("patch-text"), "{shown}");
+        assert!(!shown.contains("171"), "{shown}"); // 0xab
+        assert!(
+            shown.contains("<10 bytes>") || shown.contains("<6 bytes>"),
+            "{shown}"
+        );
+    }
+}

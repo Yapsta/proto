@@ -11,8 +11,8 @@ pub mod identity;
 /// The generated messages of `proto/yapsta/v1/yapsta.proto`.
 #[allow(
     clippy::large_enum_variant,
-    reason = "generated oneofs: a snapshot beside an Ack is a few hundred bytes of stack, \
-              and events are queued behind an Arc"
+    reason = "generated oneofs, sized by their largest message (a snapshot beside an Ack); \
+              boxing would change the API the client and bot repos build against"
 )]
 pub mod v1 {
     include!(concat!(env!("OUT_DIR"), "/yapsta.v1.rs"));
