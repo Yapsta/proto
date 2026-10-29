@@ -9,6 +9,11 @@ pub mod frame;
 pub mod identity;
 
 /// The generated messages of `proto/yapsta/v1/yapsta.proto`.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "generated oneofs: a snapshot beside an Ack is a few hundred bytes of stack, \
+              and events are queued behind an Arc"
+)]
 pub mod v1 {
     include!(concat!(env!("OUT_DIR"), "/yapsta.v1.rs"));
 }
@@ -16,8 +21,14 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The current minor version (§ 6.7). Minor versions start at 1; 0 is invalid.
-pub const MINOR_VERSION: u32 = 1;
+/// The newest minor version this crate defines (§ 6.7): 2 = M2. Minor
+/// versions start at 1; 0 is invalid. A client sends the minor it implements,
+/// not this constant by default: a client that speaks minor 2 must handle
+/// `resync` and the M2 events (§ 6.3).
+pub const MINOR_VERSION: u32 = 2;
+
+/// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
+pub const SUPPORTED_MINORS: &[u32] = &[2, 1];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -57,6 +68,15 @@ impl WireCode {
     /// Whether this is the normal close (`UNSPECIFIED`, code 0).
     pub fn is_normal_close(self) -> bool {
         self == Self::Known(v1::ErrorCode::Unspecified)
+    }
+}
+
+impl v1::Permission {
+    /// This permission's bit in a `fixed64` permission set: value N is bit
+    /// N - 1 (§ 8.3). `None` for `UNSPECIFIED`.
+    pub fn bit(self) -> Option<u64> {
+        // Every value is a small non-negative number.
+        (self as i32 as u32).checked_sub(1).map(|n| 1 << n)
     }
 }
 

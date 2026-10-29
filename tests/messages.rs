@@ -7,7 +7,7 @@
 use prost::Message;
 use yapsta_proto::v1::envelope::Body;
 use yapsta_proto::v1::*;
-use yapsta_proto::{ALPN, MINOR_VERSION, WireCode};
+use yapsta_proto::{ALPN, MINOR_VERSION, SUPPORTED_MINORS, WireCode};
 
 const GOLDEN: &str = include_str!("golden.txt");
 
@@ -15,8 +15,91 @@ fn member() -> Member {
     Member {
         account_id: 42,
         joined_at: 1_800_000_000,
+        ..Member::default()
     }
 }
+
+/// An M2 member, every field set; user text spelled so the Debug test can
+/// look for it.
+fn full_member() -> Member {
+    Member {
+        account_id: 43,
+        joined_at: 1_800_000_001,
+        nickname: Some("nick-text".to_owned()),
+        role_ids: vec![2, 3],
+        display_name: "display-text".to_owned(),
+        avatar_id: Some(77),
+        bio: "bio-text".to_owned(),
+        pronouns: "pronoun-text".to_owned(),
+    }
+}
+
+fn overwrite() -> Overwrite {
+    Overwrite {
+        channel_id: 5,
+        target: Some(overwrite::Target::AccountId(43)),
+        allow: Permission::Speak.bit().unwrap(),
+        deny: Permission::Video.bit().unwrap(),
+    }
+}
+
+fn channel() -> Channel {
+    Channel {
+        id: 5,
+        kind: ChannelKind::Voice.into(),
+        parent_id: Some(4),
+        position: 1,
+        name: "channel-text".to_owned(),
+        topic: "topic-text".to_owned(),
+        slowmode_secs: 0,
+        max_members: 10,
+        has_password: true,
+        age_restricted: true,
+        needed_talk_power: 50,
+        max_bitrate: 64_000,
+        overwrites: vec![overwrite()],
+    }
+}
+
+fn space() -> Space {
+    Space {
+        owner_account_id: 42,
+        name: "space-text".to_owned(),
+        description: "description-text".to_owned(),
+        rules: "rules-text".to_owned(),
+        icon_id: Some(76),
+    }
+}
+
+fn invite() -> Invite {
+    Invite {
+        id: 9,
+        created_by: 42,
+        created_at: 1_800_000_002,
+        expires_at: Some(1_800_086_402),
+        max_uses: Some(5),
+        uses: 1,
+        role_ids: vec![2],
+    }
+}
+
+/// Every user text, code and password the M2 examples carry.
+const M2_SECRETS: &[&str] = &[
+    "nick-text",
+    "display-text",
+    "bio-text",
+    "pronoun-text",
+    "channel-text",
+    "topic-text",
+    "space-text",
+    "description-text",
+    "rules-text",
+    "role-text",
+    "claim-code-text",
+    "invite-code-text",
+    "password-text",
+    "image/png",
+];
 
 fn presence() -> PresenceUpdate {
     PresenceUpdate {
@@ -66,10 +149,11 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 false,
                 Body::Hello(Hello {
                     server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
-                    versions: vec![MINOR_VERSION],
+                    // Literal M1 values: these fixtures pin the M1 encoding.
+                    versions: vec![1],
                     challenge: vec![1; 32],
                     capabilities: vec![Capability::Unspecified.into()],
-                    space_public_info: Some(SpacePublicInfo {}),
+                    space_public_info: Some(SpacePublicInfo::default()),
                 }),
             ),
         ),
@@ -79,7 +163,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Auth(Auth {
-                    version: MINOR_VERSION,
+                    version: 1,
                     credential: Some(auth::Credential::Device(DeviceCredential {
                         account_pub: vec![2; 32],
                         device_list: Some(device_list()),
@@ -114,6 +198,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                         seq: 100,
                         member: Some(member()),
                         presences: vec![presence()],
+                        ..Snapshot::default()
                     })),
                 }),
             ),
@@ -172,6 +257,253 @@ fn examples() -> Vec<(&'static str, Envelope)> {
         ),
         ("ack", env(6, true, Body::Ack(Ack {}))),
         ("ping", env(7, false, Body::Ping(Ping {}))),
+        // M2 (minor 2).
+        (
+            "hello_m2",
+            env(
+                0,
+                false,
+                Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: SUPPORTED_MINORS.to_vec(),
+                    challenge: vec![1; 32],
+                    capabilities: vec![],
+                    space_public_info: Some(SpacePublicInfo {
+                        name: "space-text".to_owned(),
+                        description: "description-text".to_owned(),
+                        rules: "rules-text".to_owned(),
+                        icon_id: Some(76),
+                        claimed: true,
+                    }),
+                }),
+            ),
+        ),
+        (
+            "redeem_claim",
+            env(
+                8,
+                false,
+                Body::Redeem(Redeem {
+                    code: Some(redeem::Code::ClaimCode("claim-code-text".to_owned())),
+                }),
+            ),
+        ),
+        (
+            "redeem_invite",
+            env(
+                9,
+                false,
+                Body::Redeem(Redeem {
+                    code: Some(redeem::Code::InviteCode("invite-code-text".to_owned())),
+                }),
+            ),
+        ),
+        (
+            "resync",
+            env(
+                0,
+                false,
+                Body::Resync(Snapshot {
+                    seq: 200,
+                    member: Some(full_member()),
+                    presences: vec![presence()],
+                    space: Some(Space {
+                        description: String::new(),
+                        rules: String::new(),
+                        ..space()
+                    }),
+                    channels: vec![Channel {
+                        topic: String::new(),
+                        ..channel()
+                    }],
+                    roles: vec![Role {
+                        id: 2,
+                        name: "role-text".to_owned(),
+                        color: 0x00ff_8800,
+                        position: 1,
+                        hoist: true,
+                        permissions: Permission::Administrator.bit().unwrap(),
+                        talk_power: 100,
+                    }],
+                    members: vec![Member {
+                        bio: String::new(),
+                        pronouns: String::new(),
+                        ..full_member()
+                    }],
+                    base_permissions: Permission::ViewChannel.bit().unwrap()
+                        | Permission::CreateTempChannel.bit().unwrap(),
+                    channel_permissions: vec![ChannelPermissions {
+                        channel_id: 5,
+                        permissions: u64::MAX,
+                    }],
+                }),
+            ),
+        ),
+        (
+            "command_create_channel",
+            env(
+                10,
+                false,
+                Body::Command(Command {
+                    kind: Some(command::Kind::CreateChannel(CreateChannel {
+                        kind: ChannelKind::Text.into(),
+                        parent_id: Some(4),
+                        position: Some(0),
+                        name: "channel-text".to_owned(),
+                        topic: Some("topic-text".to_owned()),
+                        slowmode_secs: Some(30),
+                        max_members: None,
+                        age_restricted: Some(false),
+                        needed_talk_power: None,
+                        max_bitrate: None,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "command_set_channel_password",
+            env(
+                11,
+                false,
+                Body::Command(Command {
+                    kind: Some(command::Kind::SetChannelPassword(SetChannelPassword {
+                        channel_id: 5,
+                        password: Some("password-text".to_owned()),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "command_delete_overwrite",
+            env(
+                12,
+                false,
+                Body::Command(Command {
+                    kind: Some(command::Kind::DeleteOverwrite(DeleteOverwrite {
+                        channel_id: 5,
+                        target: Some(delete_overwrite::Target::RoleId(1)),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "command_result_invite_created",
+            env(
+                13,
+                true,
+                Body::CommandResult(CommandResult {
+                    kind: Some(command_result::Kind::InviteCreated(InviteCreated {
+                        invite: Some(invite()),
+                        code: "invite-code-text".to_owned(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "command_result_space",
+            env(
+                14,
+                true,
+                Body::CommandResult(CommandResult {
+                    kind: Some(command_result::Kind::Space(space())),
+                }),
+            ),
+        ),
+        (
+            "request_member_page",
+            env(
+                15,
+                false,
+                Body::Request(Request {
+                    kind: Some(request::Kind::MemberPage(MemberPageRequest {
+                        after_account_id: Some(42),
+                        limit: 1000,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "response_member_page",
+            env(
+                15,
+                true,
+                Body::Response(Response {
+                    kind: Some(response::Kind::MemberPage(MemberPage {
+                        members: vec![full_member()],
+                        has_more: true,
+                        presences: vec![presence()],
+                    })),
+                }),
+            ),
+        ),
+        (
+            "response_blob",
+            env(
+                16,
+                true,
+                Body::Response(Response {
+                    kind: Some(response::Kind::Blob(BlobData {
+                        blob_id: 76,
+                        media_type: "image/png".to_owned(),
+                        data: vec![0x89, 0x50, 0x4e, 0x47],
+                    })),
+                }),
+            ),
+        ),
+        (
+            "event_channel_created",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 201,
+                    kind: Some(event::Kind::ChannelCreated(ChannelCreated {
+                        channel: Some(Channel {
+                            overwrites: vec![],
+                            ..channel()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "event_overwrite_deleted",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 202,
+                    kind: Some(event::Kind::OverwriteDeleted(OverwriteDeleted {
+                        channel_id: 5,
+                        target: Some(overwrite_deleted::Target::AccountId(43)),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "event_member_removed",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 203,
+                    kind: Some(event::Kind::MemberRemoved(MemberRemoved { account_id: 43 })),
+                }),
+            ),
+        ),
+        (
+            "ephemeral_channel_permissions",
+            env(
+                0,
+                false,
+                Body::Ephemeral(Ephemeral {
+                    kind: Some(ephemeral::Kind::ChannelPermissions(ChannelPermissions {
+                        channel_id: 5,
+                        permissions: Permission::ViewChannel.bit().unwrap(),
+                    })),
+                }),
+            ),
+        ),
     ]
 }
 
@@ -270,7 +602,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 1);
+    assert_eq!(MINOR_VERSION, 2);
+    assert_eq!(SUPPORTED_MINORS, [2, 1]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -285,10 +618,12 @@ fn debug_output_redacts_secrets_and_user_text() {
     // The resume tokens (4s and 5s) and the user text never appear.
     assert!(!env.contains("[4, 4, 4"), "{env}");
     assert!(!env.contains("[5, 5, 5"), "{env}");
-    for text in ["yapsta-cli", "0.1.0", "away"] {
+    for text in ["yapsta-cli", "0.1.0", "away"].iter().chain(M2_SECRETS) {
         assert!(!env.contains(text), "{text} in {env}");
     }
     assert!(env.contains("<32 bytes>"), "{env}");
+    // The blob's bytes (0x89 0x50 ...) never appear either.
+    assert!(!env.contains("[137, 80"), "{env}");
     // A status from a newer peer shows its number.
     let newer = PresenceUpdate {
         account_id: 1,
@@ -366,14 +701,14 @@ fn debug_output_redacts_peer_filled_fields_after_decoding() {
 #[test]
 fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     let newer = Error {
-        code: 14,
+        code: 1000,
         message: String::new(),
         retry_after_ms: None,
         device_list: None,
     };
-    assert_eq!(WireCode::of_error(&newer), WireCode::Unknown(14));
+    assert_eq!(WireCode::of_error(&newer), WireCode::Unknown(1000));
     assert!(!WireCode::of_error(&newer).is_normal_close());
-    assert_eq!(WireCode::of_close(14), WireCode::Unknown(14));
+    assert_eq!(WireCode::of_close(1000), WireCode::Unknown(1000));
     assert_eq!(WireCode::of_close(u64::MAX), WireCode::Unknown(i64::MAX));
     // Above 32 bits: never truncated into a known code (or a normal close).
     assert_eq!(WireCode::of_close(1 << 32), WireCode::Unknown(1 << 32));
@@ -387,7 +722,11 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     assert_eq!(WireCode::of_error(&negative), WireCode::Unknown(-1));
 
     assert!(WireCode::of_close(0).is_normal_close());
-    for code in [ErrorCode::SlowConsumer, ErrorCode::SessionReplaced] {
+    for code in [
+        ErrorCode::SlowConsumer,
+        ErrorCode::SessionReplaced,
+        ErrorCode::MemberRemoved,
+    ] {
         assert_eq!(WireCode::of_close(code.close_code()), WireCode::Known(code));
         let error = Error {
             code: code.into(),
@@ -397,4 +736,86 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
         };
         assert_eq!(WireCode::of_error(&error), WireCode::Known(code));
     }
+}
+
+#[test]
+fn debug_output_redacts_redeem_codes_invite_codes_and_passwords() {
+    let shown = [
+        format!(
+            "{:?}",
+            Redeem {
+                code: Some(redeem::Code::ClaimCode("claim-code-text".to_owned())),
+            }
+        ),
+        format!(
+            "{:?}",
+            Redeem {
+                code: Some(redeem::Code::InviteCode("invite-code-text".to_owned())),
+            }
+        ),
+        format!(
+            "{:?}",
+            InviteCreated {
+                invite: Some(invite()),
+                code: "invite-code-text".to_owned(),
+            }
+        ),
+        format!(
+            "{:?}",
+            SetChannelPassword {
+                channel_id: 5,
+                password: Some("password-text".to_owned()),
+            }
+        ),
+    ];
+    for shown in &shown {
+        for secret in ["claim-code-text", "invite-code-text", "password-text"] {
+            assert!(!shown.contains(secret), "{secret} in {shown}");
+        }
+    }
+    // The shape stays: which code it was and how long, and the invite itself.
+    assert_eq!(shown[0], "Redeem { code: Some(ClaimCode(<15 bytes>)) }");
+    assert_eq!(shown[1], "Redeem { code: Some(InviteCode(<16 bytes>)) }");
+    assert!(
+        shown[2].contains("uses: 1") && shown[2].contains("code: <16 bytes>"),
+        "{}",
+        shown[2]
+    );
+    assert!(
+        shown[3].contains("password: Some(<13 bytes>)"),
+        "{}",
+        shown[3]
+    );
+    // A channel kind shows its name, or a newer peer's number.
+    let kind = format!("{:?}", channel());
+    assert!(kind.contains("kind: Voice"), "{kind}");
+    let newer = format!(
+        "{:?}",
+        Channel {
+            kind: 99,
+            ..channel()
+        }
+    );
+    assert!(newer.contains("kind: Unknown(99)"), "{newer}");
+}
+
+#[test]
+fn permission_values_are_their_bits() {
+    // § 8.3: value N is bit N - 1, in the table's order, dense from 1.
+    for (permission, bit) in [
+        (Permission::ViewChannel, 0),
+        (Permission::Administrator, 14),
+        (Permission::SendMessages, 15),
+        (Permission::UseCommands, 27),
+        (Permission::Connect, 28),
+        (Permission::CreateTempChannel, 40),
+    ] {
+        assert_eq!(permission.bit(), Some(1 << bit), "{permission:?}");
+    }
+    assert_eq!(Permission::Unspecified.bit(), None);
+    for value in 1..=41 {
+        let permission = Permission::try_from(value).unwrap();
+        assert_eq!(permission.bit(), Some(1 << (value - 1)));
+    }
+    assert!(Permission::try_from(42).is_err());
 }

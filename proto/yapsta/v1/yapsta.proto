@@ -30,6 +30,17 @@ message Envelope {
     Ack ack = 10;
     // Replied to with Ack; keepalive on TCP.
     Ping ping = 11;
+    // M2 (minor 2).
+    // Non-member to member (§ 6.2).
+    Redeem redeem = 12;
+    // A live session's view reset (§ 6.3).
+    Snapshot resync = 13;
+    // Management on the control stream (§ 6.8).
+    Command command = 14;
+    CommandResult command_result = 15;
+    // Request streams (§ 6.8).
+    Request request = 16;
+    Response response = 17;
   }
 }
 
@@ -50,6 +61,8 @@ enum ErrorCode {
   ERROR_CODE_DEVICE_NOT_LISTED = 11;
   ERROR_CODE_DEVICE_EXPIRED = 12;
   ERROR_CODE_SESSION_REPLACED = 13;
+  // The account is no longer a member (§ 6.8, M2).
+  ERROR_CODE_MEMBER_REMOVED = 14;
 }
 
 message Error {
@@ -81,11 +94,19 @@ message Hello {
   // 32 bytes from the OS RNG, fresh per connection.
   bytes challenge = 3;
   repeated Capability capabilities = 4;
-  // Empty in M1; M2 adds its fields.
+  // Empty in M1; filled from M2 on.
   SpacePublicInfo space_public_info = 5;
 }
 
-message SpacePublicInfo {}
+// What a non-member may read (§ 6.2, M2).
+message SpacePublicInfo {
+  string name = 1;
+  string description = 2;
+  string rules = 3;
+  optional uint64 icon_id = 4;
+  // The space has an owner; while false only the claim code can be redeemed.
+  bool claimed = 5;
+}
 
 message Auth {
   // The highest entry of Hello.versions the client speaks.
@@ -166,6 +187,18 @@ message Event {
   uint64 seq = 1;
   oneof kind {
     MemberJoined member_joined = 2;
+    // M2 (§ 6.3).
+    SpaceUpdated space_updated = 3;
+    ChannelCreated channel_created = 4;
+    ChannelUpdated channel_updated = 5;
+    ChannelDeleted channel_deleted = 6;
+    RoleCreated role_created = 7;
+    RoleUpdated role_updated = 8;
+    RoleDeleted role_deleted = 9;
+    OverwriteSet overwrite_set = 10;
+    OverwriteDeleted overwrite_deleted = 11;
+    MemberUpdated member_updated = 12;
+    MemberRemoved member_removed = 13;
   }
 }
 
@@ -173,15 +206,27 @@ message MemberJoined {
   Member member = 1;
 }
 
+// The snapshot form leaves out bio and pronouns (§ 6.8).
 message Member {
   uint64 account_id = 1;
   // Unix seconds.
   uint64 joined_at = 2;
+  // M2 (§ 6.8).
+  optional string nickname = 3;
+  // Never lists @everyone; at most 50.
+  repeated uint64 role_ids = 4;
+  string display_name = 5;
+  optional uint64 avatar_id = 6;
+  string bio = 7;
+  string pronouns = 8;
 }
 
 message Ephemeral {
   oneof kind {
     PresenceUpdate presence_update = 1;
+    // M2: after channel_created, the receiver's permissions on the new
+    // channel (§ 6.3).
+    ChannelPermissions channel_permissions = 2;
   }
 }
 
@@ -215,6 +260,17 @@ message Snapshot {
   Member member = 2;
   // Online members.
   repeated PresenceUpdate presences = 3;
+  // M2 (§ 6.3); objects in their snapshot form (§ 6.8).
+  Space space = 4;
+  // Visible channels only, each with its overwrites.
+  repeated Channel channels = 5;
+  repeated Role roles = 6;
+  // Online members only.
+  repeated Member members = 7;
+  // § 8.2 step 1, for this account.
+  fixed64 base_permissions = 8;
+  // One per visible channel.
+  repeated ChannelPermissions channel_permissions = 9;
 }
 
 message Resumed {
@@ -225,3 +281,447 @@ message Resumed {
 message Ack {}
 
 message Ping {}
+
+// M2 (minor 2): community management (§ 6.8).
+//
+// Ids are uint64; positions, counts, seconds, colours and powers uint32;
+// permission sets fixed64 bitfields of `Permission`; times unix seconds.
+// Update commands are patches: an absent optional field stays as it is.
+
+// Value N is bit N - 1 of a permission set (§ 8.3). Bits are stable API.
+enum Permission {
+  PERMISSION_UNSPECIFIED = 0;
+  // General.
+  PERMISSION_VIEW_CHANNEL = 1;
+  PERMISSION_MANAGE_CHANNELS = 2;
+  PERMISSION_MANAGE_ROLES = 3;
+  PERMISSION_MANAGE_EMOJI = 4;
+  PERMISSION_MANAGE_WEBHOOKS = 5;
+  PERMISSION_VIEW_AUDIT_LOG = 6;
+  PERMISSION_MANAGE_SPACE = 7;
+  PERMISSION_CREATE_INVITES = 8;
+  PERMISSION_MANAGE_INVITES = 9;
+  PERMISSION_CHANGE_NICKNAME = 10;
+  PERMISSION_MANAGE_NICKNAMES = 11;
+  PERMISSION_KICK_MEMBERS = 12;
+  PERMISSION_BAN_MEMBERS = 13;
+  PERMISSION_TIMEOUT_MEMBERS = 14;
+  PERMISSION_ADMINISTRATOR = 15;
+  // Text.
+  PERMISSION_SEND_MESSAGES = 16;
+  PERMISSION_SEND_IN_THREADS = 17;
+  PERMISSION_CREATE_THREADS = 18;
+  PERMISSION_MANAGE_THREADS = 19;
+  PERMISSION_READ_HISTORY = 20;
+  PERMISSION_ATTACH_FILES = 21;
+  PERMISSION_ADD_REACTIONS = 22;
+  PERMISSION_USE_CUSTOM_EMOJI = 23;
+  PERMISSION_MENTION_EVERYONE = 24;
+  PERMISSION_MENTION_ROLES = 25;
+  PERMISSION_MANAGE_MESSAGES = 26;
+  PERMISSION_POKE = 27;
+  PERMISSION_USE_COMMANDS = 28;
+  // Voice.
+  PERMISSION_CONNECT = 29;
+  PERMISSION_SPEAK = 30;
+  PERMISSION_VIDEO = 31;
+  PERMISSION_SCREEN_SHARE = 32;
+  PERMISSION_WHISPER = 33;
+  PERMISSION_USE_VOICE_ACTIVITY = 34;
+  PERMISSION_PRIORITY_SPEAKER = 35;
+  PERMISSION_MUTE_MEMBERS = 36;
+  PERMISSION_DEAFEN_MEMBERS = 37;
+  PERMISSION_MOVE_MEMBERS = 38;
+  PERMISSION_JOIN_FULL_CHANNEL = 39;
+  PERMISSION_BYPASS_CHANNEL_PASSWORD = 40;
+  PERMISSION_CREATE_TEMP_CHANNEL = 41;
+}
+
+// Objects. The snapshot form leaves out the fields marked "full form only".
+
+message Space {
+  // 0 = no owner.
+  uint64 owner_account_id = 1;
+  string name = 2;
+  // Full form only.
+  string description = 3;
+  // Full form only.
+  string rules = 4;
+  optional uint64 icon_id = 5;
+}
+
+enum ChannelKind {
+  CHANNEL_KIND_UNSPECIFIED = 0;
+  CHANNEL_KIND_CATEGORY = 1;
+  CHANNEL_KIND_TEXT = 2;
+  CHANNEL_KIND_VOICE = 3;
+}
+
+message Channel {
+  uint64 id = 1;
+  ChannelKind kind = 2;
+  optional uint64 parent_id = 3;
+  uint32 position = 4;
+  string name = 5;
+  // Full form only.
+  string topic = 6;
+  uint32 slowmode_secs = 7;
+  // 0 = no limit.
+  uint32 max_members = 8;
+  bool has_password = 9;
+  bool age_restricted = 10;
+  uint32 needed_talk_power = 11;
+  // Bit/s; 0 = the codec default.
+  uint32 max_bitrate = 12;
+  // Only in the snapshot and get_channel.
+  repeated Overwrite overwrites = 13;
+}
+
+message Role {
+  uint64 id = 1;
+  string name = 2;
+  // 0xRRGGBB; 0 = none.
+  uint32 color = 3;
+  uint32 position = 4;
+  bool hoist = 5;
+  fixed64 permissions = 6;
+  uint32 talk_power = 7;
+}
+
+message Overwrite {
+  uint64 channel_id = 1;
+  oneof target {
+    uint64 role_id = 2;
+    uint64 account_id = 3;
+  }
+  fixed64 allow = 4;
+  fixed64 deny = 5;
+}
+
+message Invite {
+  uint64 id = 1;
+  uint64 created_by = 2;
+  uint64 created_at = 3;
+  optional uint64 expires_at = 4;
+  optional uint32 max_uses = 5;
+  uint32 uses = 6;
+  repeated uint64 role_ids = 7;
+}
+
+message BlobData {
+  uint64 blob_id = 1;
+  string media_type = 2;
+  bytes data = 3;
+}
+
+message ChannelPermissions {
+  uint64 channel_id = 1;
+  fixed64 permissions = 2;
+}
+
+// Events (§ 6.3).
+
+message SpaceUpdated {
+  Space space = 1;
+}
+
+message ChannelCreated {
+  Channel channel = 1;
+}
+
+message ChannelUpdated {
+  Channel channel = 1;
+}
+
+message ChannelDeleted {
+  uint64 channel_id = 1;
+}
+
+message RoleCreated {
+  Role role = 1;
+}
+
+message RoleUpdated {
+  Role role = 1;
+}
+
+message RoleDeleted {
+  uint64 role_id = 1;
+}
+
+message OverwriteSet {
+  Overwrite overwrite = 1;
+}
+
+message OverwriteDeleted {
+  uint64 channel_id = 1;
+  oneof target {
+    uint64 role_id = 2;
+    uint64 account_id = 3;
+  }
+}
+
+message MemberUpdated {
+  Member member = 1;
+}
+
+message MemberRemoved {
+  uint64 account_id = 1;
+}
+
+// A non-member's redemption (§ 6.2). Codes are secrets: never logged.
+message Redeem {
+  oneof code {
+    string claim_code = 1;
+    string invite_code = 2;
+  }
+}
+
+// Commands (§ 6.8), on the control stream with request_id != 0.
+message Command {
+  oneof kind {
+    GetSpace get_space = 1;
+    UpdateSpace update_space = 2;
+    SetSpaceIcon set_space_icon = 3;
+    FetchSpaceIcon fetch_space_icon = 4;
+    CreateChannel create_channel = 5;
+    UpdateChannel update_channel = 6;
+    MoveChannel move_channel = 7;
+    DeleteChannel delete_channel = 8;
+    SetChannelPassword set_channel_password = 9;
+    GetChannel get_channel = 10;
+    CreateRole create_role = 11;
+    UpdateRole update_role = 12;
+    MoveRole move_role = 13;
+    DeleteRole delete_role = 14;
+    AddMemberRole add_member_role = 15;
+    RemoveMemberRole remove_member_role = 16;
+    SetOverwrite set_overwrite = 17;
+    DeleteOverwrite delete_overwrite = 18;
+    GetMember get_member = 19;
+    UpdateProfile update_profile = 20;
+    SetAvatar set_avatar = 21;
+    SetNickname set_nickname = 22;
+    CreateInvite create_invite = 23;
+    ListInvites list_invites = 24;
+    RevokeInvite revoke_invite = 25;
+    TransferMember transfer_member = 26;
+    TransferOwnership transfer_ownership = 27;
+  }
+}
+
+message GetSpace {}
+
+message UpdateSpace {
+  optional string name = 1;
+  optional string description = 2;
+  optional string rules = 3;
+}
+
+message SetSpaceIcon {
+  // Absent clears it.
+  optional uint64 blob_id = 1;
+}
+
+message FetchSpaceIcon {}
+
+message CreateChannel {
+  ChannelKind kind = 1;
+  optional uint64 parent_id = 2;
+  optional uint32 position = 3;
+  string name = 4;
+  optional string topic = 5;
+  optional uint32 slowmode_secs = 6;
+  optional uint32 max_members = 7;
+  optional bool age_restricted = 8;
+  optional uint32 needed_talk_power = 9;
+  optional uint32 max_bitrate = 10;
+}
+
+message UpdateChannel {
+  uint64 channel_id = 1;
+  optional string name = 2;
+  optional string topic = 3;
+  optional uint32 slowmode_secs = 4;
+  optional uint32 max_members = 5;
+  optional bool age_restricted = 6;
+  optional uint32 needed_talk_power = 7;
+  optional uint32 max_bitrate = 8;
+}
+
+message MoveChannel {
+  uint64 channel_id = 1;
+  // Absent = top level.
+  optional uint64 parent_id = 2;
+  uint32 position = 3;
+}
+
+message DeleteChannel {
+  uint64 channel_id = 1;
+}
+
+message SetChannelPassword {
+  uint64 channel_id = 1;
+  // A secret. Absent clears it.
+  optional string password = 2;
+}
+
+message GetChannel {
+  uint64 channel_id = 1;
+}
+
+message CreateRole {
+  string name = 1;
+  optional uint32 color = 2;
+  optional bool hoist = 3;
+  optional fixed64 permissions = 4;
+  optional uint32 talk_power = 5;
+}
+
+message UpdateRole {
+  uint64 role_id = 1;
+  optional string name = 2;
+  optional uint32 color = 3;
+  optional bool hoist = 4;
+  optional fixed64 permissions = 5;
+  optional uint32 talk_power = 6;
+}
+
+message MoveRole {
+  uint64 role_id = 1;
+  uint32 position = 2;
+}
+
+message DeleteRole {
+  uint64 role_id = 1;
+}
+
+message AddMemberRole {
+  uint64 account_id = 1;
+  uint64 role_id = 2;
+}
+
+message RemoveMemberRole {
+  uint64 account_id = 1;
+  uint64 role_id = 2;
+}
+
+message SetOverwrite {
+  Overwrite overwrite = 1;
+}
+
+message DeleteOverwrite {
+  uint64 channel_id = 1;
+  oneof target {
+    uint64 role_id = 2;
+    uint64 account_id = 3;
+  }
+}
+
+message GetMember {
+  uint64 account_id = 1;
+}
+
+message UpdateProfile {
+  optional string display_name = 1;
+  optional string bio = 2;
+  optional string pronouns = 3;
+}
+
+message SetAvatar {
+  // Absent clears it.
+  optional uint64 blob_id = 1;
+}
+
+message SetNickname {
+  uint64 account_id = 1;
+  // Absent clears it.
+  optional string nickname = 2;
+}
+
+message CreateInvite {
+  // Absent = never expires.
+  optional uint32 expires_in_secs = 1;
+  optional uint32 max_uses = 2;
+  repeated uint64 role_ids = 3;
+}
+
+message ListInvites {}
+
+message RevokeInvite {
+  uint64 invite_id = 1;
+}
+
+message TransferMember {
+  uint64 from_account_id = 1;
+  uint64 to_account_id = 2;
+}
+
+message TransferOwnership {
+  uint64 to_account_id = 1;
+}
+
+message CommandResult {
+  oneof kind {
+    Space space = 1;
+    Channel channel = 2;
+    uint64 created_id = 3;
+    Member member = 4;
+    InviteCreated invite_created = 5;
+    InviteList invites = 6;
+    BlobData blob = 7;
+  }
+}
+
+message InviteCreated {
+  Invite invite = 1;
+  // A secret, returned once.
+  string code = 2;
+}
+
+message InviteList {
+  repeated Invite invites = 1;
+}
+
+// Requests (§ 6.8), on a QUIC request stream or multiplexed on TCP.
+message Request {
+  oneof kind {
+    MemberPageRequest member_page = 1;
+    FetchBlobRequest fetch_blob = 2;
+    UploadImageRequest upload_image = 3;
+  }
+}
+
+message MemberPageRequest {
+  optional uint64 after_account_id = 1;
+  // 1 to 1,000.
+  uint32 limit = 2;
+}
+
+message FetchBlobRequest {
+  uint64 blob_id = 1;
+}
+
+message UploadImageRequest {
+  bytes data = 1;
+}
+
+message Response {
+  oneof kind {
+    MemberPage member_page = 1;
+    BlobData blob = 2;
+    Uploaded uploaded = 3;
+  }
+}
+
+message MemberPage {
+  // Snapshot form, by ascending account_id, online and offline.
+  repeated Member members = 1;
+  bool has_more = 2;
+  // The online ones' presence.
+  repeated PresenceUpdate presences = 3;
+}
+
+message Uploaded {
+  uint64 blob_id = 1;
+}
