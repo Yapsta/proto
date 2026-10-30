@@ -445,7 +445,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                     kind: Some(response::Kind::Blob(BlobData {
                         blob_id: 76,
                         media_type: "image/png".to_owned(),
-                        data: vec![0x89, 0x50, 0x4e, 0x47],
+                        data: vec![0x89, 0x50, 0x4e, 0x47].into(),
                     })),
                 }),
             ),
