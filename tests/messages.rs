@@ -58,6 +58,8 @@ fn channel() -> Channel {
         needed_talk_power: 50,
         max_bitrate: 64_000,
         overwrites: vec![overwrite()],
+        retention_days: 0,
+        no_history: false,
     }
 }
 
@@ -81,6 +83,640 @@ fn invite() -> Invite {
         uses: 1,
         role_ids: vec![2],
     }
+}
+
+/// M3 user text and secrets (§ 6.9), spelled so the Debug test can look for
+/// them; the attachment bytes are 0xcd (205).
+const M3_SECRETS: &[&str] = &[
+    "message-text",
+    "edit-text",
+    "thread-text",
+    "emoji-name-text",
+    "unicode-text",
+    "query-text",
+    "poke-text",
+    "https://url-text",
+    "205, 205",
+];
+
+fn message() -> yapsta_proto::v1::Message {
+    yapsta_proto::v1::Message {
+        id: 70,
+        channel_id: 5,
+        thread_id: Some(69),
+        author_id: 42,
+        created_at: 1_800_000_100,
+        content: "message-text".to_owned(),
+        reply_to: Some(68),
+        mentions: Some(Mentions {
+            account_ids: vec![43],
+            role_ids: vec![2],
+            channel_ids: vec![5],
+            everyone: true,
+            here: false,
+        }),
+        attachments: vec![Attachment {
+            id: 9,
+            media_type: "image/webp".to_owned(),
+            size: 2048,
+            width: 640,
+            height: 480,
+            has_thumbnail: true,
+        }],
+        reactions: vec![ReactionCount {
+            emoji: Some(unicode()),
+            count: 2,
+            me: true,
+        }],
+        edited_at: Some(1_800_000_200),
+        deleted: false,
+        pinned: true,
+    }
+}
+
+fn unicode() -> EmojiRef {
+    EmojiRef {
+        emoji: Some(emoji_ref::Emoji::Unicode("unicode-text".to_owned())),
+    }
+}
+
+fn custom() -> EmojiRef {
+    EmojiRef {
+        emoji: Some(emoji_ref::Emoji::CustomId(11)),
+    }
+}
+
+fn thread() -> Thread {
+    Thread {
+        id: 69,
+        channel_id: 5,
+        name: "thread-text".to_owned(),
+        archived: false,
+        created_by: 42,
+        created_at: 1_800_000_050,
+    }
+}
+
+fn custom_emoji() -> CustomEmoji {
+    CustomEmoji {
+        id: 11,
+        name: "emoji-name-text".to_owned(),
+        image_id: 12,
+        created_by: 42,
+    }
+}
+
+fn read_state() -> ReadState {
+    ReadState {
+        channel_id: 5,
+        last_read_id: 60,
+        mention_count: 3,
+        last_message_id: 70,
+    }
+}
+
+/// The M3 examples (§ 6.9): one per new message, so every number is pinned
+/// in `golden.txt` too.
+fn m3_examples() -> Vec<(&'static str, Envelope)> {
+    let env = |request_id, last, body| Envelope {
+        request_id,
+        last,
+        body: Some(body),
+    };
+    let command = |kind| Body::Command(Command { kind: Some(kind) });
+    let request = |kind| Body::Request(Request { kind: Some(kind) });
+    let response = |kind| Body::Response(Response { kind: Some(kind) });
+    let event = |kind| {
+        Body::Event(Event {
+            seq: 300,
+            kind: Some(kind),
+        })
+    };
+    let ephemeral = |kind| Body::Ephemeral(Ephemeral { kind: Some(kind) });
+    use command::Kind as C;
+    use event::Kind as E;
+    use request::Kind as R;
+    vec![
+        (
+            "m3_start_typing",
+            env(
+                0,
+                false,
+                Body::StartTyping(StartTyping {
+                    channel_id: 5,
+                    thread_id: Some(69),
+                }),
+            ),
+        ),
+        (
+            "m3_send_message",
+            env(
+                30,
+                false,
+                command(C::SendMessage(SendMessage {
+                    channel_id: 5,
+                    thread_id: Some(69),
+                    content: "message-text".to_owned(),
+                    reply_to: Some(68),
+                    attachment_ids: vec![9],
+                })),
+            ),
+        ),
+        (
+            "m3_edit_message",
+            env(
+                31,
+                false,
+                command(C::EditMessage(EditMessage {
+                    message_id: 70,
+                    content: "edit-text".to_owned(),
+                })),
+            ),
+        ),
+        (
+            "m3_delete_message",
+            env(
+                32,
+                false,
+                command(C::DeleteMessage(DeleteMessage { message_id: 70 })),
+            ),
+        ),
+        (
+            "m3_add_reaction",
+            env(
+                33,
+                false,
+                command(C::AddReaction(AddReaction {
+                    message_id: 70,
+                    emoji: Some(unicode()),
+                })),
+            ),
+        ),
+        (
+            "m3_remove_reaction",
+            env(
+                34,
+                false,
+                command(C::RemoveReaction(RemoveReaction {
+                    message_id: 70,
+                    emoji: Some(custom()),
+                    account_id: Some(43),
+                })),
+            ),
+        ),
+        (
+            "m3_pin_message",
+            env(
+                35,
+                false,
+                command(C::PinMessage(PinMessage { message_id: 70 })),
+            ),
+        ),
+        (
+            "m3_unpin_message",
+            env(
+                36,
+                false,
+                command(C::UnpinMessage(UnpinMessage { message_id: 70 })),
+            ),
+        ),
+        (
+            "m3_create_thread",
+            env(
+                37,
+                false,
+                command(C::CreateThread(CreateThread {
+                    message_id: 69,
+                    name: "thread-text".to_owned(),
+                })),
+            ),
+        ),
+        (
+            "m3_update_thread",
+            env(
+                38,
+                false,
+                command(C::UpdateThread(UpdateThread {
+                    thread_id: 69,
+                    name: Some("thread-text".to_owned()),
+                    archived: Some(true),
+                })),
+            ),
+        ),
+        (
+            "m3_mark_read",
+            env(
+                39,
+                false,
+                command(C::MarkRead(MarkRead {
+                    channel_id: 5,
+                    message_id: 70,
+                })),
+            ),
+        ),
+        (
+            "m3_poke",
+            env(
+                40,
+                false,
+                command(C::Poke(PokeMember {
+                    account_id: 43,
+                    text: Some("poke-text".to_owned()),
+                })),
+            ),
+        ),
+        (
+            "m3_create_emoji",
+            env(
+                41,
+                false,
+                command(C::CreateEmoji(CreateEmoji {
+                    name: "emoji-name-text".to_owned(),
+                    image_id: 12,
+                })),
+            ),
+        ),
+        (
+            "m3_rename_emoji",
+            env(
+                42,
+                false,
+                command(C::RenameEmoji(RenameEmoji {
+                    emoji_id: 11,
+                    name: "emoji-name-text".to_owned(),
+                })),
+            ),
+        ),
+        (
+            "m3_delete_emoji",
+            env(
+                43,
+                false,
+                command(C::DeleteEmoji(DeleteEmoji { emoji_id: 11 })),
+            ),
+        ),
+        (
+            "m3_message_history",
+            env(
+                50,
+                false,
+                request(R::MessageHistory(MessageHistoryRequest {
+                    channel_id: 5,
+                    thread_id: None,
+                    anchor: Some(message_history_request::Anchor::Around(70)),
+                    limit: 50,
+                })),
+            ),
+        ),
+        (
+            "m3_get_messages",
+            env(
+                51,
+                false,
+                request(R::GetMessages(GetMessagesRequest {
+                    message_ids: vec![68, 70],
+                })),
+            ),
+        ),
+        (
+            "m3_list_pins",
+            env(
+                52,
+                false,
+                request(R::ListPins(ListPinsRequest { channel_id: 5 })),
+            ),
+        ),
+        (
+            "m3_list_threads",
+            env(
+                53,
+                false,
+                request(R::ListThreads(ListThreadsRequest {
+                    channel_id: 5,
+                    archived: true,
+                    before_id: Some(80),
+                    limit: 20,
+                })),
+            ),
+        ),
+        (
+            "m3_search",
+            env(
+                54,
+                false,
+                request(R::Search(SearchRequest {
+                    query: "query-text".to_owned(),
+                    before_id: Some(80),
+                    limit: 25,
+                })),
+            ),
+        ),
+        (
+            "m3_upload_attachment",
+            env(
+                55,
+                false,
+                request(R::UploadAttachment(UploadAttachmentRequest {
+                    data: vec![0xcd; 8],
+                })),
+            ),
+        ),
+        (
+            "m3_fetch_attachment",
+            env(
+                56,
+                false,
+                request(R::FetchAttachment(FetchAttachmentRequest {
+                    attachment_id: 9,
+                    thumbnail: true,
+                })),
+            ),
+        ),
+        (
+            "m3_attachment_url",
+            env(
+                57,
+                false,
+                request(R::AttachmentUrl(AttachmentUrlRequest {
+                    attachment_id: 9,
+                    thumbnail: false,
+                })),
+            ),
+        ),
+        (
+            "m3_upload_url",
+            env(
+                58,
+                false,
+                request(R::UploadUrl(UploadUrlRequest { size: 10 << 20 })),
+            ),
+        ),
+        (
+            "m3_upload_emoji_image",
+            env(
+                59,
+                false,
+                request(R::UploadImage(UploadImageRequest {
+                    data: vec![0xcd; 8],
+                    purpose: ImagePurpose::Emoji.into(),
+                })),
+            ),
+        ),
+        (
+            "m3_response_messages",
+            env(
+                50,
+                true,
+                response(response::Kind::Messages(MessageList {
+                    messages: vec![message()],
+                    has_more: true,
+                })),
+            ),
+        ),
+        (
+            "m3_response_threads",
+            env(
+                53,
+                true,
+                response(response::Kind::Threads(ThreadList {
+                    threads: vec![thread()],
+                    has_more: false,
+                })),
+            ),
+        ),
+        (
+            "m3_response_url",
+            env(
+                57,
+                true,
+                response(response::Kind::Url(SignedUrl {
+                    url: "https://url-text".to_owned(),
+                    expires_at: 1_800_000_600,
+                })),
+            ),
+        ),
+        (
+            "m3_response_upload_slot",
+            env(
+                58,
+                true,
+                response(response::Kind::UploadSlot(UploadSlot {
+                    attachment_id: 13,
+                    url: "https://url-text".to_owned(),
+                    expires_at: 1_800_000_600,
+                })),
+            ),
+        ),
+        (
+            "m3_event_message_created",
+            env(
+                0,
+                false,
+                event(E::MessageCreated(MessageCreated {
+                    message: Some(message()),
+                })),
+            ),
+        ),
+        (
+            "m3_event_message_updated",
+            env(
+                0,
+                false,
+                event(E::MessageUpdated(MessageUpdated {
+                    message: Some(message()),
+                })),
+            ),
+        ),
+        (
+            "m3_event_message_deleted",
+            env(
+                0,
+                false,
+                event(E::MessageDeleted(MessageDeleted {
+                    channel_id: 5,
+                    message_id: 70,
+                })),
+            ),
+        ),
+        (
+            "m3_event_reaction_added",
+            env(
+                0,
+                false,
+                event(E::ReactionAdded(ReactionAdded {
+                    channel_id: 5,
+                    message_id: 70,
+                    emoji: Some(unicode()),
+                    account_id: 43,
+                })),
+            ),
+        ),
+        (
+            "m3_event_reaction_removed",
+            env(
+                0,
+                false,
+                event(E::ReactionRemoved(ReactionRemoved {
+                    channel_id: 5,
+                    message_id: 70,
+                    emoji: Some(custom()),
+                    account_id: 43,
+                })),
+            ),
+        ),
+        (
+            "m3_event_message_pinned",
+            env(
+                0,
+                false,
+                event(E::MessagePinned(MessagePinned {
+                    channel_id: 5,
+                    message_id: 70,
+                    pinned_by: 42,
+                })),
+            ),
+        ),
+        (
+            "m3_event_message_unpinned",
+            env(
+                0,
+                false,
+                event(E::MessageUnpinned(MessageUnpinned {
+                    channel_id: 5,
+                    message_id: 70,
+                })),
+            ),
+        ),
+        (
+            "m3_event_thread_created",
+            env(
+                0,
+                false,
+                event(E::ThreadCreated(ThreadCreated {
+                    thread: Some(thread()),
+                })),
+            ),
+        ),
+        (
+            "m3_event_thread_updated",
+            env(
+                0,
+                false,
+                event(E::ThreadUpdated(ThreadUpdated {
+                    thread: Some(thread()),
+                })),
+            ),
+        ),
+        (
+            "m3_event_emoji_created",
+            env(
+                0,
+                false,
+                event(E::EmojiCreated(EmojiCreated {
+                    emoji: Some(custom_emoji()),
+                })),
+            ),
+        ),
+        (
+            "m3_event_emoji_updated",
+            env(
+                0,
+                false,
+                event(E::EmojiUpdated(EmojiUpdated {
+                    emoji: Some(custom_emoji()),
+                })),
+            ),
+        ),
+        (
+            "m3_event_emoji_deleted",
+            env(
+                0,
+                false,
+                event(E::EmojiDeleted(EmojiDeleted { emoji_id: 11 })),
+            ),
+        ),
+        (
+            "m3_ephemeral_typing",
+            env(
+                0,
+                false,
+                ephemeral(ephemeral::Kind::Typing(Typing {
+                    channel_id: 5,
+                    thread_id: None,
+                    account_id: 43,
+                })),
+            ),
+        ),
+        (
+            "m3_ephemeral_poke",
+            env(
+                0,
+                false,
+                ephemeral(ephemeral::Kind::Poke(Poke {
+                    from_account_id: 42,
+                    text: "poke-text".to_owned(),
+                })),
+            ),
+        ),
+        (
+            "m3_ephemeral_read_state",
+            env(
+                0,
+                false,
+                ephemeral(ephemeral::Kind::ReadState(read_state())),
+            ),
+        ),
+        (
+            "m3_resync",
+            env(
+                0,
+                false,
+                Body::Resync(Snapshot {
+                    seq: 301,
+                    read_states: vec![read_state()],
+                    emoji: vec![custom_emoji()],
+                    channels: vec![Channel {
+                        topic: String::new(),
+                        retention_days: 30,
+                        no_history: false,
+                        ..channel()
+                    }],
+                    ..Snapshot::default()
+                }),
+            ),
+        ),
+        (
+            "m3_welcome_resumed",
+            env(
+                0,
+                false,
+                Body::Welcome(Welcome {
+                    session_id: 13,
+                    account_id: Some(42),
+                    membership: None,
+                    resume_token: None,
+                    device_list: None,
+                    state: Some(welcome::State::Resumed(Resumed {
+                        presences: vec![],
+                        read_states: vec![read_state()],
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m3_command_update_channel",
+            env(
+                60,
+                false,
+                command(C::UpdateChannel(UpdateChannel {
+                    channel_id: 5,
+                    retention_days: Some(7),
+                    no_history: Some(true),
+                    ..UpdateChannel::default()
+                })),
+            ),
+        ),
+    ]
 }
 
 /// Every user text, code and password the M2 examples carry.
@@ -216,6 +852,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                     device_list: None,
                     state: Some(welcome::State::Resumed(Resumed {
                         presences: vec![presence()],
+                        read_states: vec![],
                     })),
                 }),
             ),
@@ -265,7 +902,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 false,
                 Body::Hello(Hello {
                     server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
-                    versions: SUPPORTED_MINORS.to_vec(),
+                    versions: vec![2, 1], // An M2 server's Hello, as committed.
                     challenge: vec![1; 32],
                     capabilities: vec![],
                     space_public_info: Some(SpacePublicInfo {
@@ -336,6 +973,8 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                         channel_id: 5,
                         permissions: u64::MAX,
                     }],
+                    read_states: vec![],
+                    emoji: vec![],
                 }),
             ),
         ),
@@ -356,6 +995,8 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                         age_restricted: Some(false),
                         needed_talk_power: None,
                         max_bitrate: None,
+                        retention_days: None,
+                        no_history: None,
                     })),
                 }),
             ),
@@ -505,6 +1146,9 @@ fn examples() -> Vec<(&'static str, Envelope)> {
             ),
         ),
     ]
+    .into_iter()
+    .chain(m3_examples())
+    .collect()
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -602,8 +1246,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 2);
-    assert_eq!(SUPPORTED_MINORS, [2, 1]);
+    assert_eq!(MINOR_VERSION, 3);
+    assert_eq!(SUPPORTED_MINORS, [3, 2]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -618,7 +1262,11 @@ fn debug_output_redacts_secrets_and_user_text() {
     // The resume tokens (4s and 5s) and the user text never appear.
     assert!(!env.contains("[4, 4, 4"), "{env}");
     assert!(!env.contains("[5, 5, 5"), "{env}");
-    for text in ["yapsta-cli", "0.1.0", "away"].iter().chain(M2_SECRETS) {
+    for text in ["yapsta-cli", "0.1.0", "away"]
+        .iter()
+        .chain(M2_SECRETS)
+        .chain(M3_SECRETS)
+    {
         assert!(!env.contains(text), "{text} in {env}");
     }
     assert!(env.contains("<32 bytes>"), "{env}");
@@ -874,6 +1522,7 @@ fn debug_output_redacts_every_patch_command() {
             "{:?}",
             UploadImageRequest {
                 data: vec![0xab; 6],
+                purpose: 0,
             }
         ),
     ];
@@ -885,4 +1534,68 @@ fn debug_output_redacts_every_patch_command() {
             "{shown}"
         );
     }
+}
+
+#[test]
+fn every_m3_example_carries_its_secrets_only_in_redacted_form() {
+    // Each secret is on the wire (so the Debug test above is not vacuous)...
+    let wire: Vec<Vec<u8>> = m3_examples()
+        .iter()
+        .map(|(_, env)| env.encode_to_vec())
+        .collect();
+    for text in M3_SECRETS.iter().filter(|t| !t.starts_with("205")) {
+        assert!(
+            wire.iter()
+                .any(|bytes| bytes.windows(text.len()).any(|w| w == text.as_bytes())),
+            "{text} is in no M3 example"
+        );
+    }
+    // ...and shown only as its length.
+    for (name, env) in m3_examples() {
+        let shown = format!("{env:?}");
+        for text in M3_SECRETS {
+            assert!(!shown.contains(text), "{name}: {text} in {shown}");
+        }
+    }
+}
+
+#[test]
+fn each_body_and_kind_names_the_minor_that_added_it() {
+    use yapsta_proto::minor_of;
+    let minor = |name: &str| {
+        let (_, env) = examples().into_iter().find(|(n, _)| *n == name).unwrap();
+        minor_of(&env.body.unwrap())
+    };
+    for (name, expected) in [
+        ("error", 1),
+        ("event_member_joined", 1),
+        ("m3_event_message_created", 1),
+        ("command_create_channel", 2),
+        ("m3_command_update_channel", 2),
+        ("m3_upload_emoji_image", 2),
+        ("m3_start_typing", 3),
+    ] {
+        assert_eq!(minor(name), expected, "{name}");
+    }
+    // Every M3 command and request kind is minor 3: a minor-2 session that
+    // sends one is refused for its version (§ 6.7). The two M2 kinds above
+    // only gained M3 fields.
+    let mut m3_kinds = 0;
+    for (name, env) in m3_examples() {
+        let body = env.body.unwrap();
+        if matches!(body, Body::Command(_) | Body::Request(_))
+            && !["m3_command_update_channel", "m3_upload_emoji_image"].contains(&name)
+        {
+            assert_eq!(minor_of(&body), 3, "{name}");
+            m3_kinds += 1;
+        }
+    }
+    assert_eq!(
+        m3_kinds,
+        14 + 9,
+        "every M3 command and request kind has an example"
+    );
+    // An unset kind is refused as unknown, not for its version.
+    assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
+    assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);
 }
