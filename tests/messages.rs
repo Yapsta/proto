@@ -85,7 +85,6 @@ fn invite() -> Invite {
     }
 }
 
-/// Every user text, code and password the M2 examples carry.
 /// M3 user text and secrets (§ 6.9), spelled so the Debug test can look for
 /// them; the attachment bytes are 0xcd (205).
 const M3_SECRETS: &[&str] = &[
@@ -720,6 +719,7 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// Every user text, code and password the M2 examples carry.
 const M2_SECRETS: &[&str] = &[
     "nick-text",
     "display-text",
@@ -1574,14 +1574,27 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         ("m3_command_update_channel", 2),
         ("m3_upload_emoji_image", 2),
         ("m3_start_typing", 3),
-        ("m3_send_message", 3),
-        ("m3_poke", 3),
-        ("m3_delete_emoji", 3),
-        ("m3_message_history", 3),
-        ("m3_upload_url", 3),
     ] {
         assert_eq!(minor(name), expected, "{name}");
     }
+    // Every M3 command and request kind is minor 3: a minor-2 session that
+    // sends one is refused for its version (§ 6.7). The two M2 kinds above
+    // only gained M3 fields.
+    let mut m3_kinds = 0;
+    for (name, env) in m3_examples() {
+        let body = env.body.unwrap();
+        if matches!(body, Body::Command(_) | Body::Request(_))
+            && !["m3_command_update_channel", "m3_upload_emoji_image"].contains(&name)
+        {
+            assert_eq!(minor_of(&body), 3, "{name}");
+            m3_kinds += 1;
+        }
+    }
+    assert_eq!(
+        m3_kinds,
+        14 + 9,
+        "every M3 command and request kind has an example"
+    );
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);
