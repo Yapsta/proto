@@ -26,6 +26,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|l| format!(".{l}"));
     prost_build::Config::new()
         .skip_debug(redacted)
+        // An image (§ 6.5) is served to many sessions from one buffer:
+        // cloning a reply shares it. The Rust type only; the wire is the same.
+        .bytes([".yapsta.v1.BlobData.data"])
         .compile_fds(files)?;
     Ok(())
 }

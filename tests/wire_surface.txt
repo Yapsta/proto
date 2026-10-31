@@ -1,9 +1,14 @@
 enum yapsta.v1.Capability.CAPABILITY_UNSPECIFIED = 0
+enum yapsta.v1.ChannelKind.CHANNEL_KIND_CATEGORY = 1
+enum yapsta.v1.ChannelKind.CHANNEL_KIND_TEXT = 2
+enum yapsta.v1.ChannelKind.CHANNEL_KIND_UNSPECIFIED = 0
+enum yapsta.v1.ChannelKind.CHANNEL_KIND_VOICE = 3
 enum yapsta.v1.ErrorCode.ERROR_CODE_CONFLICT = 6
 enum yapsta.v1.ErrorCode.ERROR_CODE_DEVICE_EXPIRED = 12
 enum yapsta.v1.ErrorCode.ERROR_CODE_DEVICE_NOT_LISTED = 11
 enum yapsta.v1.ErrorCode.ERROR_CODE_FORBIDDEN = 2
 enum yapsta.v1.ErrorCode.ERROR_CODE_INVALID = 5
+enum yapsta.v1.ErrorCode.ERROR_CODE_MEMBER_REMOVED = 14
 enum yapsta.v1.ErrorCode.ERROR_CODE_NOT_FOUND = 3
 enum yapsta.v1.ErrorCode.ERROR_CODE_RATE_LIMITED = 4
 enum yapsta.v1.ErrorCode.ERROR_CODE_SESSION_REPLACED = 13
@@ -13,20 +18,142 @@ enum yapsta.v1.ErrorCode.ERROR_CODE_UNAUTHENTICATED = 1
 enum yapsta.v1.ErrorCode.ERROR_CODE_UNAVAILABLE = 8
 enum yapsta.v1.ErrorCode.ERROR_CODE_UNSPECIFIED = 0
 enum yapsta.v1.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION = 10
+enum yapsta.v1.Permission.PERMISSION_ADD_REACTIONS = 22
+enum yapsta.v1.Permission.PERMISSION_ADMINISTRATOR = 15
+enum yapsta.v1.Permission.PERMISSION_ATTACH_FILES = 21
+enum yapsta.v1.Permission.PERMISSION_BAN_MEMBERS = 13
+enum yapsta.v1.Permission.PERMISSION_BYPASS_CHANNEL_PASSWORD = 40
+enum yapsta.v1.Permission.PERMISSION_CHANGE_NICKNAME = 10
+enum yapsta.v1.Permission.PERMISSION_CONNECT = 29
+enum yapsta.v1.Permission.PERMISSION_CREATE_INVITES = 8
+enum yapsta.v1.Permission.PERMISSION_CREATE_TEMP_CHANNEL = 41
+enum yapsta.v1.Permission.PERMISSION_CREATE_THREADS = 18
+enum yapsta.v1.Permission.PERMISSION_DEAFEN_MEMBERS = 37
+enum yapsta.v1.Permission.PERMISSION_JOIN_FULL_CHANNEL = 39
+enum yapsta.v1.Permission.PERMISSION_KICK_MEMBERS = 12
+enum yapsta.v1.Permission.PERMISSION_MANAGE_CHANNELS = 2
+enum yapsta.v1.Permission.PERMISSION_MANAGE_EMOJI = 4
+enum yapsta.v1.Permission.PERMISSION_MANAGE_INVITES = 9
+enum yapsta.v1.Permission.PERMISSION_MANAGE_MESSAGES = 26
+enum yapsta.v1.Permission.PERMISSION_MANAGE_NICKNAMES = 11
+enum yapsta.v1.Permission.PERMISSION_MANAGE_ROLES = 3
+enum yapsta.v1.Permission.PERMISSION_MANAGE_SPACE = 7
+enum yapsta.v1.Permission.PERMISSION_MANAGE_THREADS = 19
+enum yapsta.v1.Permission.PERMISSION_MANAGE_WEBHOOKS = 5
+enum yapsta.v1.Permission.PERMISSION_MENTION_EVERYONE = 24
+enum yapsta.v1.Permission.PERMISSION_MENTION_ROLES = 25
+enum yapsta.v1.Permission.PERMISSION_MOVE_MEMBERS = 38
+enum yapsta.v1.Permission.PERMISSION_MUTE_MEMBERS = 36
+enum yapsta.v1.Permission.PERMISSION_POKE = 27
+enum yapsta.v1.Permission.PERMISSION_PRIORITY_SPEAKER = 35
+enum yapsta.v1.Permission.PERMISSION_READ_HISTORY = 20
+enum yapsta.v1.Permission.PERMISSION_SCREEN_SHARE = 32
+enum yapsta.v1.Permission.PERMISSION_SEND_IN_THREADS = 17
+enum yapsta.v1.Permission.PERMISSION_SEND_MESSAGES = 16
+enum yapsta.v1.Permission.PERMISSION_SPEAK = 30
+enum yapsta.v1.Permission.PERMISSION_TIMEOUT_MEMBERS = 14
+enum yapsta.v1.Permission.PERMISSION_UNSPECIFIED = 0
+enum yapsta.v1.Permission.PERMISSION_USE_COMMANDS = 28
+enum yapsta.v1.Permission.PERMISSION_USE_CUSTOM_EMOJI = 23
+enum yapsta.v1.Permission.PERMISSION_USE_VOICE_ACTIVITY = 34
+enum yapsta.v1.Permission.PERMISSION_VIDEO = 31
+enum yapsta.v1.Permission.PERMISSION_VIEW_AUDIT_LOG = 6
+enum yapsta.v1.Permission.PERMISSION_VIEW_CHANNEL = 1
+enum yapsta.v1.Permission.PERMISSION_WHISPER = 33
 enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_DND = 4
 enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_IDLE = 3
 enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_INVISIBLE = 5
 enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_OFFLINE = 1
 enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_ONLINE = 2
 enum yapsta.v1.PresenceStatus.PRESENCE_STATUS_UNSPECIFIED = 0
+field yapsta.v1.AddMemberRole.account_id = 1 singular uint64
+field yapsta.v1.AddMemberRole.role_id = 2 singular uint64
 field yapsta.v1.Auth.capabilities = 3 repeated .yapsta.v1.Capability
 field yapsta.v1.Auth.client_info = 4 singular .yapsta.v1.ClientInfo
 field yapsta.v1.Auth.device = 2 singular .yapsta.v1.DeviceCredential oneof credential
 field yapsta.v1.Auth.presence = 5 optional .yapsta.v1.PresenceStatus
 field yapsta.v1.Auth.resume = 6 optional .yapsta.v1.Resume
 field yapsta.v1.Auth.version = 1 singular uint32
+field yapsta.v1.BlobData.blob_id = 1 singular uint64
+field yapsta.v1.BlobData.data = 3 singular bytes
+field yapsta.v1.BlobData.media_type = 2 singular string
+field yapsta.v1.Channel.age_restricted = 10 singular bool
+field yapsta.v1.Channel.has_password = 9 singular bool
+field yapsta.v1.Channel.id = 1 singular uint64
+field yapsta.v1.Channel.kind = 2 singular .yapsta.v1.ChannelKind
+field yapsta.v1.Channel.max_bitrate = 12 singular uint32
+field yapsta.v1.Channel.max_members = 8 singular uint32
+field yapsta.v1.Channel.name = 5 singular string
+field yapsta.v1.Channel.needed_talk_power = 11 singular uint32
+field yapsta.v1.Channel.overwrites = 13 repeated .yapsta.v1.Overwrite
+field yapsta.v1.Channel.parent_id = 3 optional uint64
+field yapsta.v1.Channel.position = 4 singular uint32
+field yapsta.v1.Channel.slowmode_secs = 7 singular uint32
+field yapsta.v1.Channel.topic = 6 singular string
+field yapsta.v1.ChannelCreated.channel = 1 singular .yapsta.v1.Channel
+field yapsta.v1.ChannelDeleted.channel_id = 1 singular uint64
+field yapsta.v1.ChannelPermissions.channel_id = 1 singular uint64
+field yapsta.v1.ChannelPermissions.permissions = 2 singular fixed64
+field yapsta.v1.ChannelUpdated.channel = 1 singular .yapsta.v1.Channel
 field yapsta.v1.ClientInfo.name = 1 singular string
 field yapsta.v1.ClientInfo.version = 2 singular string
+field yapsta.v1.Command.add_member_role = 15 singular .yapsta.v1.AddMemberRole oneof kind
+field yapsta.v1.Command.create_channel = 5 singular .yapsta.v1.CreateChannel oneof kind
+field yapsta.v1.Command.create_invite = 23 singular .yapsta.v1.CreateInvite oneof kind
+field yapsta.v1.Command.create_role = 11 singular .yapsta.v1.CreateRole oneof kind
+field yapsta.v1.Command.delete_channel = 8 singular .yapsta.v1.DeleteChannel oneof kind
+field yapsta.v1.Command.delete_overwrite = 18 singular .yapsta.v1.DeleteOverwrite oneof kind
+field yapsta.v1.Command.delete_role = 14 singular .yapsta.v1.DeleteRole oneof kind
+field yapsta.v1.Command.fetch_space_icon = 4 singular .yapsta.v1.FetchSpaceIcon oneof kind
+field yapsta.v1.Command.get_channel = 10 singular .yapsta.v1.GetChannel oneof kind
+field yapsta.v1.Command.get_member = 19 singular .yapsta.v1.GetMember oneof kind
+field yapsta.v1.Command.get_space = 1 singular .yapsta.v1.GetSpace oneof kind
+field yapsta.v1.Command.list_invites = 24 singular .yapsta.v1.ListInvites oneof kind
+field yapsta.v1.Command.move_channel = 7 singular .yapsta.v1.MoveChannel oneof kind
+field yapsta.v1.Command.move_role = 13 singular .yapsta.v1.MoveRole oneof kind
+field yapsta.v1.Command.remove_member_role = 16 singular .yapsta.v1.RemoveMemberRole oneof kind
+field yapsta.v1.Command.revoke_invite = 25 singular .yapsta.v1.RevokeInvite oneof kind
+field yapsta.v1.Command.set_avatar = 21 singular .yapsta.v1.SetAvatar oneof kind
+field yapsta.v1.Command.set_channel_password = 9 singular .yapsta.v1.SetChannelPassword oneof kind
+field yapsta.v1.Command.set_nickname = 22 singular .yapsta.v1.SetNickname oneof kind
+field yapsta.v1.Command.set_overwrite = 17 singular .yapsta.v1.SetOverwrite oneof kind
+field yapsta.v1.Command.set_space_icon = 3 singular .yapsta.v1.SetSpaceIcon oneof kind
+field yapsta.v1.Command.transfer_member = 26 singular .yapsta.v1.TransferMember oneof kind
+field yapsta.v1.Command.transfer_ownership = 27 singular .yapsta.v1.TransferOwnership oneof kind
+field yapsta.v1.Command.update_channel = 6 singular .yapsta.v1.UpdateChannel oneof kind
+field yapsta.v1.Command.update_profile = 20 singular .yapsta.v1.UpdateProfile oneof kind
+field yapsta.v1.Command.update_role = 12 singular .yapsta.v1.UpdateRole oneof kind
+field yapsta.v1.Command.update_space = 2 singular .yapsta.v1.UpdateSpace oneof kind
+field yapsta.v1.CommandResult.blob = 7 singular .yapsta.v1.BlobData oneof kind
+field yapsta.v1.CommandResult.channel = 2 singular .yapsta.v1.Channel oneof kind
+field yapsta.v1.CommandResult.created_id = 3 singular uint64 oneof kind
+field yapsta.v1.CommandResult.invite_created = 5 singular .yapsta.v1.InviteCreated oneof kind
+field yapsta.v1.CommandResult.invites = 6 singular .yapsta.v1.InviteList oneof kind
+field yapsta.v1.CommandResult.member = 4 singular .yapsta.v1.Member oneof kind
+field yapsta.v1.CommandResult.space = 1 singular .yapsta.v1.Space oneof kind
+field yapsta.v1.CreateChannel.age_restricted = 8 optional bool
+field yapsta.v1.CreateChannel.kind = 1 singular .yapsta.v1.ChannelKind
+field yapsta.v1.CreateChannel.max_bitrate = 10 optional uint32
+field yapsta.v1.CreateChannel.max_members = 7 optional uint32
+field yapsta.v1.CreateChannel.name = 4 singular string
+field yapsta.v1.CreateChannel.needed_talk_power = 9 optional uint32
+field yapsta.v1.CreateChannel.parent_id = 2 optional uint64
+field yapsta.v1.CreateChannel.position = 3 optional uint32
+field yapsta.v1.CreateChannel.slowmode_secs = 6 optional uint32
+field yapsta.v1.CreateChannel.topic = 5 optional string
+field yapsta.v1.CreateInvite.expires_in_secs = 1 optional uint32
+field yapsta.v1.CreateInvite.max_uses = 2 optional uint32
+field yapsta.v1.CreateInvite.role_ids = 3 repeated uint64
+field yapsta.v1.CreateRole.color = 2 optional uint32
+field yapsta.v1.CreateRole.hoist = 3 optional bool
+field yapsta.v1.CreateRole.name = 1 singular string
+field yapsta.v1.CreateRole.permissions = 4 optional fixed64
+field yapsta.v1.CreateRole.talk_power = 5 optional uint32
+field yapsta.v1.DeleteChannel.channel_id = 1 singular uint64
+field yapsta.v1.DeleteOverwrite.account_id = 3 singular uint64 oneof target
+field yapsta.v1.DeleteOverwrite.channel_id = 1 singular uint64
+field yapsta.v1.DeleteOverwrite.role_id = 2 singular uint64 oneof target
+field yapsta.v1.DeleteRole.role_id = 1 singular uint64
 field yapsta.v1.DeviceCredential.account_pub = 1 singular bytes
 field yapsta.v1.DeviceCredential.device_list = 2 singular .yapsta.v1.SignedDeviceList
 field yapsta.v1.DeviceCredential.device_pub = 3 singular bytes
@@ -37,44 +164,172 @@ field yapsta.v1.DeviceListBody.devices = 2 repeated .yapsta.v1.DeviceEntry
 field yapsta.v1.DeviceListBody.version = 1 singular uint64
 field yapsta.v1.Envelope.ack = 10 singular .yapsta.v1.Ack oneof body
 field yapsta.v1.Envelope.auth = 5 singular .yapsta.v1.Auth oneof body
+field yapsta.v1.Envelope.command = 14 singular .yapsta.v1.Command oneof body
+field yapsta.v1.Envelope.command_result = 15 singular .yapsta.v1.CommandResult oneof body
 field yapsta.v1.Envelope.ephemeral = 8 singular .yapsta.v1.Ephemeral oneof body
 field yapsta.v1.Envelope.error = 3 singular .yapsta.v1.Error oneof body
 field yapsta.v1.Envelope.event = 7 singular .yapsta.v1.Event oneof body
 field yapsta.v1.Envelope.hello = 4 singular .yapsta.v1.Hello oneof body
 field yapsta.v1.Envelope.last = 2 singular bool
 field yapsta.v1.Envelope.ping = 11 singular .yapsta.v1.Ping oneof body
+field yapsta.v1.Envelope.redeem = 12 singular .yapsta.v1.Redeem oneof body
+field yapsta.v1.Envelope.request = 16 singular .yapsta.v1.Request oneof body
 field yapsta.v1.Envelope.request_id = 1 singular uint32
+field yapsta.v1.Envelope.response = 17 singular .yapsta.v1.Response oneof body
+field yapsta.v1.Envelope.resync = 13 singular .yapsta.v1.Snapshot oneof body
 field yapsta.v1.Envelope.set_presence = 9 singular .yapsta.v1.SetPresence oneof body
 field yapsta.v1.Envelope.welcome = 6 singular .yapsta.v1.Welcome oneof body
+field yapsta.v1.Ephemeral.channel_permissions = 2 singular .yapsta.v1.ChannelPermissions oneof kind
 field yapsta.v1.Ephemeral.presence_update = 1 singular .yapsta.v1.PresenceUpdate oneof kind
 field yapsta.v1.Error.code = 1 singular .yapsta.v1.ErrorCode
 field yapsta.v1.Error.device_list = 4 optional .yapsta.v1.SignedDeviceList
 field yapsta.v1.Error.message = 2 singular string
 field yapsta.v1.Error.retry_after_ms = 3 optional uint64
+field yapsta.v1.Event.channel_created = 4 singular .yapsta.v1.ChannelCreated oneof kind
+field yapsta.v1.Event.channel_deleted = 6 singular .yapsta.v1.ChannelDeleted oneof kind
+field yapsta.v1.Event.channel_updated = 5 singular .yapsta.v1.ChannelUpdated oneof kind
 field yapsta.v1.Event.member_joined = 2 singular .yapsta.v1.MemberJoined oneof kind
+field yapsta.v1.Event.member_removed = 13 singular .yapsta.v1.MemberRemoved oneof kind
+field yapsta.v1.Event.member_updated = 12 singular .yapsta.v1.MemberUpdated oneof kind
+field yapsta.v1.Event.overwrite_deleted = 11 singular .yapsta.v1.OverwriteDeleted oneof kind
+field yapsta.v1.Event.overwrite_set = 10 singular .yapsta.v1.OverwriteSet oneof kind
+field yapsta.v1.Event.role_created = 7 singular .yapsta.v1.RoleCreated oneof kind
+field yapsta.v1.Event.role_deleted = 9 singular .yapsta.v1.RoleDeleted oneof kind
+field yapsta.v1.Event.role_updated = 8 singular .yapsta.v1.RoleUpdated oneof kind
 field yapsta.v1.Event.seq = 1 singular uint64
+field yapsta.v1.Event.space_updated = 3 singular .yapsta.v1.SpaceUpdated oneof kind
+field yapsta.v1.FetchBlobRequest.blob_id = 1 singular uint64
+field yapsta.v1.GetChannel.channel_id = 1 singular uint64
+field yapsta.v1.GetMember.account_id = 1 singular uint64
 field yapsta.v1.Hello.capabilities = 4 repeated .yapsta.v1.Capability
 field yapsta.v1.Hello.challenge = 3 singular bytes
 field yapsta.v1.Hello.server_id = 1 singular string
 field yapsta.v1.Hello.space_public_info = 5 singular .yapsta.v1.SpacePublicInfo
 field yapsta.v1.Hello.versions = 2 repeated uint32
+field yapsta.v1.Invite.created_at = 3 singular uint64
+field yapsta.v1.Invite.created_by = 2 singular uint64
+field yapsta.v1.Invite.expires_at = 4 optional uint64
+field yapsta.v1.Invite.id = 1 singular uint64
+field yapsta.v1.Invite.max_uses = 5 optional uint32
+field yapsta.v1.Invite.role_ids = 7 repeated uint64
+field yapsta.v1.Invite.uses = 6 singular uint32
+field yapsta.v1.InviteCreated.code = 2 singular string
+field yapsta.v1.InviteCreated.invite = 1 singular .yapsta.v1.Invite
+field yapsta.v1.InviteList.invites = 1 repeated .yapsta.v1.Invite
 field yapsta.v1.Member.account_id = 1 singular uint64
+field yapsta.v1.Member.avatar_id = 6 optional uint64
+field yapsta.v1.Member.bio = 7 singular string
+field yapsta.v1.Member.display_name = 5 singular string
 field yapsta.v1.Member.joined_at = 2 singular uint64
+field yapsta.v1.Member.nickname = 3 optional string
+field yapsta.v1.Member.pronouns = 8 singular string
+field yapsta.v1.Member.role_ids = 4 repeated uint64
 field yapsta.v1.MemberJoined.member = 1 singular .yapsta.v1.Member
+field yapsta.v1.MemberPage.has_more = 2 singular bool
+field yapsta.v1.MemberPage.members = 1 repeated .yapsta.v1.Member
+field yapsta.v1.MemberPage.presences = 3 repeated .yapsta.v1.PresenceUpdate
+field yapsta.v1.MemberPageRequest.after_account_id = 1 optional uint64
+field yapsta.v1.MemberPageRequest.limit = 2 singular uint32
+field yapsta.v1.MemberRemoved.account_id = 1 singular uint64
+field yapsta.v1.MemberUpdated.member = 1 singular .yapsta.v1.Member
+field yapsta.v1.MoveChannel.channel_id = 1 singular uint64
+field yapsta.v1.MoveChannel.parent_id = 2 optional uint64
+field yapsta.v1.MoveChannel.position = 3 singular uint32
+field yapsta.v1.MoveRole.position = 2 singular uint32
+field yapsta.v1.MoveRole.role_id = 1 singular uint64
+field yapsta.v1.Overwrite.account_id = 3 singular uint64 oneof target
+field yapsta.v1.Overwrite.allow = 4 singular fixed64
+field yapsta.v1.Overwrite.channel_id = 1 singular uint64
+field yapsta.v1.Overwrite.deny = 5 singular fixed64
+field yapsta.v1.Overwrite.role_id = 2 singular uint64 oneof target
+field yapsta.v1.OverwriteDeleted.account_id = 3 singular uint64 oneof target
+field yapsta.v1.OverwriteDeleted.channel_id = 1 singular uint64
+field yapsta.v1.OverwriteDeleted.role_id = 2 singular uint64 oneof target
+field yapsta.v1.OverwriteSet.overwrite = 1 singular .yapsta.v1.Overwrite
 field yapsta.v1.PresenceUpdate.account_id = 1 singular uint64
 field yapsta.v1.PresenceUpdate.custom_status = 3 singular string
 field yapsta.v1.PresenceUpdate.status = 2 singular .yapsta.v1.PresenceStatus
+field yapsta.v1.Redeem.claim_code = 1 singular string oneof code
+field yapsta.v1.Redeem.invite_code = 2 singular string oneof code
+field yapsta.v1.RemoveMemberRole.account_id = 1 singular uint64
+field yapsta.v1.RemoveMemberRole.role_id = 2 singular uint64
+field yapsta.v1.Request.fetch_blob = 2 singular .yapsta.v1.FetchBlobRequest oneof kind
+field yapsta.v1.Request.member_page = 1 singular .yapsta.v1.MemberPageRequest oneof kind
+field yapsta.v1.Request.upload_image = 3 singular .yapsta.v1.UploadImageRequest oneof kind
+field yapsta.v1.Response.blob = 2 singular .yapsta.v1.BlobData oneof kind
+field yapsta.v1.Response.member_page = 1 singular .yapsta.v1.MemberPage oneof kind
+field yapsta.v1.Response.uploaded = 3 singular .yapsta.v1.Uploaded oneof kind
 field yapsta.v1.Resume.last_seq = 2 singular uint64
 field yapsta.v1.Resume.token = 1 singular bytes
 field yapsta.v1.Resumed.presences = 1 repeated .yapsta.v1.PresenceUpdate
+field yapsta.v1.RevokeInvite.invite_id = 1 singular uint64
+field yapsta.v1.Role.color = 3 singular uint32
+field yapsta.v1.Role.hoist = 5 singular bool
+field yapsta.v1.Role.id = 1 singular uint64
+field yapsta.v1.Role.name = 2 singular string
+field yapsta.v1.Role.permissions = 6 singular fixed64
+field yapsta.v1.Role.position = 4 singular uint32
+field yapsta.v1.Role.talk_power = 7 singular uint32
+field yapsta.v1.RoleCreated.role = 1 singular .yapsta.v1.Role
+field yapsta.v1.RoleDeleted.role_id = 1 singular uint64
+field yapsta.v1.RoleUpdated.role = 1 singular .yapsta.v1.Role
+field yapsta.v1.SetAvatar.blob_id = 1 optional uint64
+field yapsta.v1.SetChannelPassword.channel_id = 1 singular uint64
+field yapsta.v1.SetChannelPassword.password = 2 optional string
+field yapsta.v1.SetNickname.account_id = 1 singular uint64
+field yapsta.v1.SetNickname.nickname = 2 optional string
+field yapsta.v1.SetOverwrite.overwrite = 1 singular .yapsta.v1.Overwrite
 field yapsta.v1.SetPresence.afk = 2 optional bool
 field yapsta.v1.SetPresence.custom_status = 3 optional string
 field yapsta.v1.SetPresence.status = 1 optional .yapsta.v1.PresenceStatus
+field yapsta.v1.SetSpaceIcon.blob_id = 1 optional uint64
 field yapsta.v1.SignedDeviceList.body = 1 singular bytes
 field yapsta.v1.SignedDeviceList.signature = 2 singular bytes
+field yapsta.v1.Snapshot.base_permissions = 8 singular fixed64
+field yapsta.v1.Snapshot.channel_permissions = 9 repeated .yapsta.v1.ChannelPermissions
+field yapsta.v1.Snapshot.channels = 5 repeated .yapsta.v1.Channel
 field yapsta.v1.Snapshot.member = 2 singular .yapsta.v1.Member
+field yapsta.v1.Snapshot.members = 7 repeated .yapsta.v1.Member
 field yapsta.v1.Snapshot.presences = 3 repeated .yapsta.v1.PresenceUpdate
+field yapsta.v1.Snapshot.roles = 6 repeated .yapsta.v1.Role
 field yapsta.v1.Snapshot.seq = 1 singular uint64
+field yapsta.v1.Snapshot.space = 4 singular .yapsta.v1.Space
+field yapsta.v1.Space.description = 3 singular string
+field yapsta.v1.Space.icon_id = 5 optional uint64
+field yapsta.v1.Space.name = 2 singular string
+field yapsta.v1.Space.owner_account_id = 1 singular uint64
+field yapsta.v1.Space.rules = 4 singular string
+field yapsta.v1.SpacePublicInfo.claimed = 5 singular bool
+field yapsta.v1.SpacePublicInfo.description = 2 singular string
+field yapsta.v1.SpacePublicInfo.icon_id = 4 optional uint64
+field yapsta.v1.SpacePublicInfo.name = 1 singular string
+field yapsta.v1.SpacePublicInfo.rules = 3 singular string
+field yapsta.v1.SpaceUpdated.space = 1 singular .yapsta.v1.Space
+field yapsta.v1.TransferMember.from_account_id = 1 singular uint64
+field yapsta.v1.TransferMember.to_account_id = 2 singular uint64
+field yapsta.v1.TransferOwnership.to_account_id = 1 singular uint64
+field yapsta.v1.UpdateChannel.age_restricted = 6 optional bool
+field yapsta.v1.UpdateChannel.channel_id = 1 singular uint64
+field yapsta.v1.UpdateChannel.max_bitrate = 8 optional uint32
+field yapsta.v1.UpdateChannel.max_members = 5 optional uint32
+field yapsta.v1.UpdateChannel.name = 2 optional string
+field yapsta.v1.UpdateChannel.needed_talk_power = 7 optional uint32
+field yapsta.v1.UpdateChannel.slowmode_secs = 4 optional uint32
+field yapsta.v1.UpdateChannel.topic = 3 optional string
+field yapsta.v1.UpdateProfile.bio = 2 optional string
+field yapsta.v1.UpdateProfile.display_name = 1 optional string
+field yapsta.v1.UpdateProfile.pronouns = 3 optional string
+field yapsta.v1.UpdateRole.color = 3 optional uint32
+field yapsta.v1.UpdateRole.hoist = 4 optional bool
+field yapsta.v1.UpdateRole.name = 2 optional string
+field yapsta.v1.UpdateRole.permissions = 5 optional fixed64
+field yapsta.v1.UpdateRole.role_id = 1 singular uint64
+field yapsta.v1.UpdateRole.talk_power = 6 optional uint32
+field yapsta.v1.UpdateSpace.description = 2 optional string
+field yapsta.v1.UpdateSpace.name = 1 optional string
+field yapsta.v1.UpdateSpace.rules = 3 optional string
+field yapsta.v1.UploadImageRequest.data = 1 singular bytes
+field yapsta.v1.Uploaded.blob_id = 1 singular uint64
 field yapsta.v1.Welcome.account_id = 2 optional uint64
 field yapsta.v1.Welcome.device_list = 5 optional .yapsta.v1.SignedDeviceList
 field yapsta.v1.Welcome.membership = 3 optional .yapsta.v1.Member
@@ -83,8 +338,23 @@ field yapsta.v1.Welcome.resumed = 7 singular .yapsta.v1.Resumed oneof state
 field yapsta.v1.Welcome.session_id = 1 singular uint64
 field yapsta.v1.Welcome.snapshot = 6 singular .yapsta.v1.Snapshot oneof state
 message yapsta.v1.Ack
+message yapsta.v1.AddMemberRole
 message yapsta.v1.Auth
+message yapsta.v1.BlobData
+message yapsta.v1.Channel
+message yapsta.v1.ChannelCreated
+message yapsta.v1.ChannelDeleted
+message yapsta.v1.ChannelPermissions
+message yapsta.v1.ChannelUpdated
 message yapsta.v1.ClientInfo
+message yapsta.v1.Command
+message yapsta.v1.CommandResult
+message yapsta.v1.CreateChannel
+message yapsta.v1.CreateInvite
+message yapsta.v1.CreateRole
+message yapsta.v1.DeleteChannel
+message yapsta.v1.DeleteOverwrite
+message yapsta.v1.DeleteRole
 message yapsta.v1.DeviceCredential
 message yapsta.v1.DeviceEntry
 message yapsta.v1.DeviceListBody
@@ -92,15 +362,57 @@ message yapsta.v1.Envelope
 message yapsta.v1.Ephemeral
 message yapsta.v1.Error
 message yapsta.v1.Event
+message yapsta.v1.FetchBlobRequest
+message yapsta.v1.FetchSpaceIcon
+message yapsta.v1.GetChannel
+message yapsta.v1.GetMember
+message yapsta.v1.GetSpace
 message yapsta.v1.Hello
+message yapsta.v1.Invite
+message yapsta.v1.InviteCreated
+message yapsta.v1.InviteList
+message yapsta.v1.ListInvites
 message yapsta.v1.Member
 message yapsta.v1.MemberJoined
+message yapsta.v1.MemberPage
+message yapsta.v1.MemberPageRequest
+message yapsta.v1.MemberRemoved
+message yapsta.v1.MemberUpdated
+message yapsta.v1.MoveChannel
+message yapsta.v1.MoveRole
+message yapsta.v1.Overwrite
+message yapsta.v1.OverwriteDeleted
+message yapsta.v1.OverwriteSet
 message yapsta.v1.Ping
 message yapsta.v1.PresenceUpdate
+message yapsta.v1.Redeem
+message yapsta.v1.RemoveMemberRole
+message yapsta.v1.Request
+message yapsta.v1.Response
 message yapsta.v1.Resume
 message yapsta.v1.Resumed
+message yapsta.v1.RevokeInvite
+message yapsta.v1.Role
+message yapsta.v1.RoleCreated
+message yapsta.v1.RoleDeleted
+message yapsta.v1.RoleUpdated
+message yapsta.v1.SetAvatar
+message yapsta.v1.SetChannelPassword
+message yapsta.v1.SetNickname
+message yapsta.v1.SetOverwrite
 message yapsta.v1.SetPresence
+message yapsta.v1.SetSpaceIcon
 message yapsta.v1.SignedDeviceList
 message yapsta.v1.Snapshot
+message yapsta.v1.Space
 message yapsta.v1.SpacePublicInfo
+message yapsta.v1.SpaceUpdated
+message yapsta.v1.TransferMember
+message yapsta.v1.TransferOwnership
+message yapsta.v1.UpdateChannel
+message yapsta.v1.UpdateProfile
+message yapsta.v1.UpdateRole
+message yapsta.v1.UpdateSpace
+message yapsta.v1.UploadImageRequest
+message yapsta.v1.Uploaded
 message yapsta.v1.Welcome
