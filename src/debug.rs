@@ -13,11 +13,13 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use crate::v1::{
-    BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateRole, Error, ErrorCode,
-    InviteCreated, Member, PresenceStatus, PresenceUpdate, Redeem, Resume, Role,
-    SetChannelPassword, SetNickname, SetPresence, SignedDeviceList, Space, SpacePublicInfo,
-    UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace, UploadImageRequest, Welcome, redeem,
-    welcome,
+    BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji, CreateRole,
+    CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
+    InviteCreated, Member, Message, Poke, PokeMember, PresenceStatus, PresenceUpdate, Redeem,
+    RenameEmoji, Resume, Role, SearchRequest, SendMessage, SetChannelPassword, SetNickname,
+    SetPresence, SignedDeviceList, SignedUrl, Space, SpacePublicInfo, Thread, UpdateChannel,
+    UpdateProfile, UpdateRole, UpdateSpace, UpdateThread, UploadAttachmentRequest,
+    UploadImageRequest, UploadSlot, Welcome, emoji_ref, redeem, welcome,
 };
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -51,8 +53,8 @@ impl<E: TryFrom<i32> + fmt::Debug> fmt::Debug for Enum<E> {
 
 /// `Debug` for a message, naming every field (no `..`, so a new field is a
 /// compile error here): `text` shows a string or bytes field's length only,
-/// `opt_text` the same for an optional one, `kind` a `ChannelKind`, and a
-/// bare field prints as it is.
+/// `opt_text` the same for an optional one, `kind` a `ChannelKind`, `purpose`
+/// an `ImagePurpose`, and a bare field prints as it is.
 macro_rules! redacting_debug {
     ($message:ident { $($field:ident $(: $how:ident)?),* $(,)? }) => {
         impl fmt::Debug for $message {
@@ -68,6 +70,7 @@ macro_rules! redacting_debug {
     (@show $field:ident text) => { Redacted($field.len()) };
     (@show $field:ident opt_text) => { redacted($field) };
     (@show $field:ident kind) => { known::<ChannelKind>(*$field) };
+    (@show $field:ident purpose) => { known::<ImagePurpose>(*$field) };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -210,6 +213,8 @@ redacting_debug!(Channel {
     needed_talk_power,
     max_bitrate,
     overwrites,
+    retention_days,
+    no_history,
 });
 redacting_debug!(Role {
     id,
@@ -251,6 +256,8 @@ redacting_debug!(CreateChannel {
     age_restricted,
     needed_talk_power,
     max_bitrate,
+    retention_days,
+    no_history,
 });
 redacting_debug!(UpdateChannel {
     channel_id,
@@ -261,6 +268,8 @@ redacting_debug!(UpdateChannel {
     age_restricted,
     needed_talk_power,
     max_bitrate,
+    retention_days,
+    no_history,
 });
 redacting_debug!(SetChannelPassword {
     channel_id,
@@ -291,7 +300,10 @@ redacting_debug!(SetNickname {
     nickname: opt_text
 });
 redacting_debug!(InviteCreated { invite, code: text });
-redacting_debug!(UploadImageRequest { data: text });
+redacting_debug!(UploadImageRequest {
+    data: text,
+    purpose: purpose
+});
 redacting_debug!(Redeem { code });
 
 impl fmt::Debug for redeem::Code {
@@ -303,3 +315,102 @@ impl fmt::Debug for redeem::Code {
         f.debug_tuple(name).field(&Redacted(code.len())).finish()
     }
 }
+
+// M3 (§ 6.9): message text, thread and emoji names, Unicode reactions, search
+// queries, poke text and attachment bytes are user content; signed file URLs
+// are secrets until they expire.
+
+redacting_debug!(Message {
+    id,
+    channel_id,
+    thread_id,
+    author_id,
+    created_at,
+    content: text,
+    reply_to,
+    mentions,
+    attachments,
+    reactions,
+    edited_at,
+    deleted,
+    pinned,
+});
+redacting_debug!(EmojiRef { emoji });
+
+impl fmt::Debug for emoji_ref::Emoji {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unicode(text) => f
+                .debug_tuple("Unicode")
+                .field(&Redacted(text.len()))
+                .finish(),
+            Self::CustomId(id) => f.debug_tuple("CustomId").field(id).finish(),
+        }
+    }
+}
+
+redacting_debug!(Thread {
+    id,
+    channel_id,
+    name: text,
+    archived,
+    created_by,
+    created_at
+});
+redacting_debug!(CustomEmoji {
+    id,
+    name: text,
+    image_id,
+    created_by
+});
+redacting_debug!(SendMessage {
+    channel_id,
+    thread_id,
+    content: text,
+    reply_to,
+    attachment_ids
+});
+redacting_debug!(EditMessage {
+    message_id,
+    content: text
+});
+redacting_debug!(CreateThread {
+    message_id,
+    name: text
+});
+redacting_debug!(UpdateThread {
+    thread_id,
+    name: opt_text,
+    archived
+});
+redacting_debug!(PokeMember {
+    account_id,
+    text: opt_text
+});
+redacting_debug!(CreateEmoji {
+    name: text,
+    image_id
+});
+redacting_debug!(RenameEmoji {
+    emoji_id,
+    name: text
+});
+redacting_debug!(SearchRequest {
+    query: text,
+    before_id,
+    limit
+});
+redacting_debug!(UploadAttachmentRequest { data: text });
+redacting_debug!(SignedUrl {
+    url: text,
+    expires_at
+});
+redacting_debug!(UploadSlot {
+    attachment_id,
+    url: text,
+    expires_at
+});
+redacting_debug!(Poke {
+    from_account_id,
+    text: text
+});
