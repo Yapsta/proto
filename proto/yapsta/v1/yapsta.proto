@@ -215,6 +215,8 @@ message Event {
     EmojiCreated emoji_created = 23;
     EmojiUpdated emoji_updated = 24;
     EmojiDeleted emoji_deleted = 25;
+    // M4 (§ 6.10).
+    VoiceStateUpdated voice_state_updated = 26;
   }
 }
 
@@ -249,6 +251,9 @@ message Ephemeral {
     Poke poke = 4;
     // To the account's other sessions, after mark_read.
     ReadState read_state = 5;
+    // M4 (§ 6.10): to one session, whenever its own voice membership
+    // changes.
+    VoiceSession voice_session = 6;
   }
 }
 
@@ -297,6 +302,8 @@ message Snapshot {
   repeated ReadState read_states = 10;
   // The space's custom emoji.
   repeated CustomEmoji emoji = 11;
+  // M4 (§ 6.10): the states in voice channels this session can see.
+  repeated VoiceState voice_states = 12;
 }
 
 message Resumed {
@@ -407,6 +414,8 @@ message Channel {
   uint32 retention_days = 14;
   // Messages are kept only resume_ring_secs.
   bool no_history = 15;
+  // M4 (§ 6.10), voice channels: deleted once empty for 60 s.
+  bool temporary = 16;
 }
 
 message Role {
@@ -555,6 +564,15 @@ message Command {
     CreateEmoji create_emoji = 39;
     RenameEmoji rename_emoji = 40;
     DeleteEmoji delete_emoji = 41;
+    // M4 (§ 6.10).
+    JoinVoice join_voice = 42;
+    LeaveVoice leave_voice = 43;
+    SetVoiceState set_voice_state = 44;
+    SetMemberVoice set_member_voice = 45;
+    MoveMember move_member = 46;
+    DisconnectMember disconnect_member = 47;
+    SetWhisperList set_whisper_list = 48;
+    ClearWhisperList clear_whisper_list = 49;
   }
 }
 
@@ -587,6 +605,8 @@ message CreateChannel {
   // M3 (§ 6.9), text channels.
   optional uint32 retention_days = 11;
   optional bool no_history = 12;
+  // M4 (§ 6.10): a temporary voice channel; needs CREATE_TEMP_CHANNEL.
+  optional bool temporary = 13;
 }
 
 message UpdateChannel {
@@ -969,6 +989,78 @@ message RenameEmoji {
 
 message DeleteEmoji {
   uint64 emoji_id = 1;
+}
+
+// Voice (§ 6.10). The datagrams themselves are not protobuf (§ 6.4, the
+// voice module).
+
+// An account's place in voice. channel_id 0 = not in voice (session_ref is
+// then 0 too).
+message VoiceState {
+  uint64 account_id = 1;
+  uint64 channel_id = 2;
+  // Minted on every join and move; never reused while the server runs.
+  uint32 session_ref = 3;
+  bool self_mute = 4;
+  bool self_deaf = 5;
+  bool server_mute = 6;
+  bool server_deaf = 7;
+  bool priority = 8;
+}
+
+// The account's whole state after a change, and the voice channel it was in
+// before (0 = none; 0 too in a copy for a session that cannot see it).
+message VoiceStateUpdated {
+  VoiceState state = 1;
+  uint64 previous_channel_id = 2;
+}
+
+// A session's own voice membership: the session_ref its datagrams carry and
+// the channel, or 0 and 0 once it is out of voice.
+message VoiceSession {
+  uint32 session_ref = 1;
+  uint64 channel_id = 2;
+}
+
+message JoinVoice {
+  uint64 channel_id = 1;
+  // A secret: 1-64 bytes, never logged.
+  optional string password = 2;
+}
+
+message LeaveVoice {}
+
+message SetVoiceState {
+  optional bool self_mute = 1;
+  optional bool self_deaf = 2;
+  optional bool priority = 3;
+}
+
+message SetMemberVoice {
+  uint64 account_id = 1;
+  optional bool server_mute = 2;
+  optional bool server_deaf = 3;
+}
+
+message MoveMember {
+  uint64 account_id = 1;
+  uint64 channel_id = 2;
+}
+
+message DisconnectMember {
+  uint64 account_id = 1;
+}
+
+// list_id 1-8; at most 50 accounts, 10 channels and 10 roles (not @everyone).
+message SetWhisperList {
+  uint32 list_id = 1;
+  repeated uint64 account_ids = 2;
+  repeated uint64 channel_ids = 3;
+  repeated uint64 role_ids = 4;
+}
+
+message ClearWhisperList {
+  uint32 list_id = 1;
 }
 
 // Requests.
