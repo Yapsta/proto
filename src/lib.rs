@@ -7,6 +7,7 @@
 mod debug;
 pub mod frame;
 pub mod identity;
+pub mod voice;
 
 /// The generated messages of `proto/yapsta/v1/yapsta.proto`.
 #[allow(
@@ -21,15 +22,15 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 3 = M3. Minor
+/// The newest minor version this crate defines (§ 6.7): 4 = M4. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 3 must handle the
-/// M3 events, ephemerals and snapshot fields (§ 6.3, § 6.9).
-pub const MINOR_VERSION: u32 = 3;
+/// not this constant by default: a client that speaks minor 4 must handle the
+/// M4 event, ephemeral and snapshot field (§ 6.3, § 6.10).
+pub const MINOR_VERSION: u32 = 4;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 1 (M1) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[3, 2];
+/// The current and the previous one; minor 2 (M2) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[4, 3];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -172,6 +173,14 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::CreateEmoji(_)
         | Kind::RenameEmoji(_)
         | Kind::DeleteEmoji(_) => 3,
+        Kind::JoinVoice(_)
+        | Kind::LeaveVoice(_)
+        | Kind::SetVoiceState(_)
+        | Kind::SetMemberVoice(_)
+        | Kind::MoveMember(_)
+        | Kind::DisconnectMember(_)
+        | Kind::SetWhisperList(_)
+        | Kind::ClearWhisperList(_) => 4,
     }
 }
 
