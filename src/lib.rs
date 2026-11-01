@@ -21,14 +21,15 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 2 = M2. Minor
+/// The newest minor version this crate defines (§ 6.7): 3 = M3. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 2 must handle
-/// `resync` and the M2 events (§ 6.3).
-pub const MINOR_VERSION: u32 = 2;
+/// not this constant by default: a client that speaks minor 3 must handle the
+/// M3 events, ephemerals and snapshot fields (§ 6.3, § 6.9).
+pub const MINOR_VERSION: u32 = 3;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-pub const SUPPORTED_MINORS: &[u32] = &[2, 1];
+/// The current and the previous one; minor 1 (M1) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[3, 2];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -99,5 +100,94 @@ impl v1::Error {
             retry_after_ms: None,
             device_list: None,
         }
+    }
+}
+
+/// The minor that introduced an envelope body, looking inside a `Command` or
+/// `Request` at its kind (§ 6.7): a session on an older minor that sends it is
+/// answered `INVALID`. An unset body or kind is minor 1: it is refused as
+/// unknown, not for its version. Exhaustive, so a new body or kind does not
+/// compile until it is classified here.
+pub fn minor_of(body: &v1::envelope::Body) -> u32 {
+    use v1::envelope::Body;
+    match body {
+        Body::Error(_)
+        | Body::Hello(_)
+        | Body::Auth(_)
+        | Body::Welcome(_)
+        | Body::Event(_)
+        | Body::Ephemeral(_)
+        | Body::SetPresence(_)
+        | Body::Ack(_)
+        | Body::Ping(_) => 1,
+        Body::Redeem(_) | Body::Resync(_) | Body::CommandResult(_) | Body::Response(_) => 2,
+        Body::Command(command) => command.kind.as_ref().map_or(2, command_minor),
+        Body::Request(request) => request.kind.as_ref().map_or(2, request_minor),
+        Body::StartTyping(_) => 3,
+    }
+}
+
+/// The minor that introduced a command kind (§ 6.7).
+pub fn command_minor(kind: &v1::command::Kind) -> u32 {
+    use v1::command::Kind;
+    match kind {
+        Kind::GetSpace(_)
+        | Kind::UpdateSpace(_)
+        | Kind::SetSpaceIcon(_)
+        | Kind::FetchSpaceIcon(_)
+        | Kind::CreateChannel(_)
+        | Kind::UpdateChannel(_)
+        | Kind::MoveChannel(_)
+        | Kind::DeleteChannel(_)
+        | Kind::SetChannelPassword(_)
+        | Kind::GetChannel(_)
+        | Kind::CreateRole(_)
+        | Kind::UpdateRole(_)
+        | Kind::MoveRole(_)
+        | Kind::DeleteRole(_)
+        | Kind::AddMemberRole(_)
+        | Kind::RemoveMemberRole(_)
+        | Kind::SetOverwrite(_)
+        | Kind::DeleteOverwrite(_)
+        | Kind::GetMember(_)
+        | Kind::UpdateProfile(_)
+        | Kind::SetAvatar(_)
+        | Kind::SetNickname(_)
+        | Kind::CreateInvite(_)
+        | Kind::ListInvites(_)
+        | Kind::RevokeInvite(_)
+        | Kind::TransferMember(_)
+        | Kind::TransferOwnership(_) => 2,
+        Kind::SendMessage(_)
+        | Kind::EditMessage(_)
+        | Kind::DeleteMessage(_)
+        | Kind::AddReaction(_)
+        | Kind::RemoveReaction(_)
+        | Kind::PinMessage(_)
+        | Kind::UnpinMessage(_)
+        | Kind::CreateThread(_)
+        | Kind::UpdateThread(_)
+        | Kind::MarkRead(_)
+        | Kind::Poke(_)
+        | Kind::CreateEmoji(_)
+        | Kind::RenameEmoji(_)
+        | Kind::DeleteEmoji(_) => 3,
+    }
+}
+
+/// The minor that introduced a request kind (§ 6.7).
+pub fn request_minor(kind: &v1::request::Kind) -> u32 {
+    use v1::request::Kind;
+    match kind {
+        Kind::MemberPage(_) | Kind::FetchBlob(_) | Kind::UploadImage(_) => 2,
+        Kind::MessageHistory(_)
+        | Kind::GetMessages(_)
+        | Kind::ListPins(_)
+        | Kind::ListThreads(_)
+        | Kind::Search(_)
+        | Kind::UploadAttachment(_)
+        | Kind::FetchAttachment(_)
+        | Kind::AttachmentUrl(_)
+        | Kind::UploadUrl(_) => 3,
     }
 }

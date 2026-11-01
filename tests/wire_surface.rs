@@ -23,6 +23,8 @@ const REDACTED_DEBUG: &str = include_str!("../redacted_debug.txt");
 /// Free text and signed bodies are redacted, whatever the sender is meant to
 /// put there.
 const PUBLIC_FIELDS: &[&str] = &[
+    // Sniffed by the server from a fixed table (§ 6.5), never the client's.
+    "yapsta.v1.Attachment.media_type",
     "yapsta.v1.DeviceCredential.account_pub",
     "yapsta.v1.DeviceCredential.device_pub",
     "yapsta.v1.DeviceCredential.signature",

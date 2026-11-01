@@ -41,6 +41,9 @@ message Envelope {
     // Request streams (§ 6.8).
     Request request = 16;
     Response response = 17;
+    // M3 (minor 3).
+    // Typing (§ 6.9): request_id 0, never answered.
+    StartTyping start_typing = 18;
   }
 }
 
@@ -199,6 +202,19 @@ message Event {
     OverwriteDeleted overwrite_deleted = 11;
     MemberUpdated member_updated = 12;
     MemberRemoved member_removed = 13;
+    // M3 (§ 6.9).
+    MessageCreated message_created = 14;
+    MessageUpdated message_updated = 15;
+    MessageDeleted message_deleted = 16;
+    ReactionAdded reaction_added = 17;
+    ReactionRemoved reaction_removed = 18;
+    MessagePinned message_pinned = 19;
+    MessageUnpinned message_unpinned = 20;
+    ThreadCreated thread_created = 21;
+    ThreadUpdated thread_updated = 22;
+    EmojiCreated emoji_created = 23;
+    EmojiUpdated emoji_updated = 24;
+    EmojiDeleted emoji_deleted = 25;
   }
 }
 
@@ -227,6 +243,12 @@ message Ephemeral {
     // M2: after channel_created, the receiver's permissions on the new
     // channel (§ 6.3).
     ChannelPermissions channel_permissions = 2;
+    // M3 (§ 6.9): to the sessions that see the channel, not the sender's.
+    Typing typing = 3;
+    // To the target account's sessions.
+    Poke poke = 4;
+    // To the account's other sessions, after mark_read.
+    ReadState read_state = 5;
   }
 }
 
@@ -271,11 +293,17 @@ message Snapshot {
   fixed64 base_permissions = 8;
   // One per visible channel.
   repeated ChannelPermissions channel_permissions = 9;
+  // M3 (§ 6.9): every visible text channel.
+  repeated ReadState read_states = 10;
+  // The space's custom emoji.
+  repeated CustomEmoji emoji = 11;
 }
 
 message Resumed {
   // Current presence of online members; ephemeral events are not replayed.
   repeated PresenceUpdate presences = 1;
+  // M3 (§ 6.9): read states travel as ephemerals, so they are not replayed.
+  repeated ReadState read_states = 2;
 }
 
 message Ack {}
@@ -375,6 +403,10 @@ message Channel {
   uint32 max_bitrate = 12;
   // Only in the snapshot and get_channel.
   repeated Overwrite overwrites = 13;
+  // M3 (§ 6.9), text channels: 0 = keep messages forever, else days.
+  uint32 retention_days = 14;
+  // Messages are kept only resume_ring_secs.
+  bool no_history = 15;
 }
 
 message Role {
@@ -507,6 +539,22 @@ message Command {
     RevokeInvite revoke_invite = 25;
     TransferMember transfer_member = 26;
     TransferOwnership transfer_ownership = 27;
+    // M3 (§ 6.9).
+    SendMessage send_message = 28;
+    EditMessage edit_message = 29;
+    DeleteMessage delete_message = 30;
+    AddReaction add_reaction = 31;
+    RemoveReaction remove_reaction = 32;
+    PinMessage pin_message = 33;
+    UnpinMessage unpin_message = 34;
+    CreateThread create_thread = 35;
+    UpdateThread update_thread = 36;
+    MarkRead mark_read = 37;
+    // Named PokeMember: Poke is the ephemeral the target receives.
+    PokeMember poke = 38;
+    CreateEmoji create_emoji = 39;
+    RenameEmoji rename_emoji = 40;
+    DeleteEmoji delete_emoji = 41;
   }
 }
 
@@ -536,6 +584,9 @@ message CreateChannel {
   optional bool age_restricted = 8;
   optional uint32 needed_talk_power = 9;
   optional uint32 max_bitrate = 10;
+  // M3 (§ 6.9), text channels.
+  optional uint32 retention_days = 11;
+  optional bool no_history = 12;
 }
 
 message UpdateChannel {
@@ -547,6 +598,9 @@ message UpdateChannel {
   optional bool age_restricted = 6;
   optional uint32 needed_talk_power = 7;
   optional uint32 max_bitrate = 8;
+  // M3 (§ 6.9), text channels.
+  optional uint32 retention_days = 9;
+  optional bool no_history = 10;
 }
 
 message MoveChannel {
@@ -689,6 +743,16 @@ message Request {
     MemberPageRequest member_page = 1;
     FetchBlobRequest fetch_blob = 2;
     UploadImageRequest upload_image = 3;
+    // M3 (§ 6.9).
+    MessageHistoryRequest message_history = 4;
+    GetMessagesRequest get_messages = 5;
+    ListPinsRequest list_pins = 6;
+    ListThreadsRequest list_threads = 7;
+    SearchRequest search = 8;
+    UploadAttachmentRequest upload_attachment = 9;
+    FetchAttachmentRequest fetch_attachment = 10;
+    AttachmentUrlRequest attachment_url = 11;
+    UploadUrlRequest upload_url = 12;
   }
 }
 
@@ -704,6 +768,16 @@ message FetchBlobRequest {
 
 message UploadImageRequest {
   bytes data = 1;
+  // M3 (§ 6.5, § 6.9). UNSPECIFIED means AVATAR.
+  ImagePurpose purpose = 2;
+}
+
+enum ImagePurpose {
+  IMAGE_PURPOSE_UNSPECIFIED = 0;
+  // Re-encoded to at most 512 x 512 px: avatars and the space icon.
+  IMAGE_PURPOSE_AVATAR = 1;
+  // Re-encoded to at most 128 x 128 px: custom emoji.
+  IMAGE_PURPOSE_EMOJI = 2;
 }
 
 message Response {
@@ -711,6 +785,11 @@ message Response {
     MemberPage member_page = 1;
     BlobData blob = 2;
     Uploaded uploaded = 3;
+    // M3 (§ 6.9).
+    MessageList messages = 4;
+    ThreadList threads = 5;
+    SignedUrl url = 6;
+    UploadSlot upload_slot = 7;
   }
 }
 
@@ -724,4 +803,333 @@ message MemberPage {
 
 message Uploaded {
   uint64 blob_id = 1;
+}
+
+// M3 (minor 3): text chat (§ 6.9). Ids uint64, times unix seconds; message ids
+// increase in commit order. User text here is data, never markup, and never
+// logged (§ 7.6).
+
+// Objects.
+
+message Message {
+  uint64 id = 1;
+  uint64 channel_id = 2;
+  // Set on a thread's messages: the thread's (root message's) id.
+  optional uint64 thread_id = 3;
+  // 0 = a deleted member (§ 7.3).
+  uint64 author_id = 4;
+  uint64 created_at = 5;
+  // Empty on a tombstone.
+  string content = 6;
+  optional uint64 reply_to = 7;
+  // Parsed by the server from content; never sent by clients.
+  Mentions mentions = 8;
+  repeated Attachment attachments = 9;
+  repeated ReactionCount reactions = 10;
+  optional uint64 edited_at = 11;
+  // A tombstone: no content, mentions, attachments or reactions.
+  bool deleted = 12;
+  bool pinned = 13;
+}
+
+message Mentions {
+  repeated uint64 account_ids = 1;
+  repeated uint64 role_ids = 2;
+  repeated uint64 channel_ids = 3;
+  bool everyone = 4;
+  bool here = 5;
+}
+
+// No file name, ever (§ 6.5).
+message Attachment {
+  uint64 id = 1;
+  // Sniffed by the server from the file's first bytes.
+  string media_type = 2;
+  uint64 size = 3;
+  // 0 when not an image.
+  uint32 width = 4;
+  uint32 height = 5;
+  bool has_thumbnail = 6;
+}
+
+message EmojiRef {
+  oneof emoji {
+    string unicode = 1;
+    uint64 custom_id = 2;
+  }
+}
+
+message ReactionCount {
+  EmojiRef emoji = 1;
+  uint32 count = 2;
+  // Whether the requester reacted: set in Responses only, false in events.
+  bool me = 3;
+}
+
+// Thread.id is its root message's id.
+message Thread {
+  uint64 id = 1;
+  uint64 channel_id = 2;
+  string name = 3;
+  bool archived = 4;
+  uint64 created_by = 5;
+  uint64 created_at = 6;
+}
+
+message CustomEmoji {
+  uint64 id = 1;
+  string name = 2;
+  // An attachment id, fetched with fetch_blob.
+  uint64 image_id = 3;
+  uint64 created_by = 4;
+}
+
+// Covers a channel together with its threads.
+message ReadState {
+  uint64 channel_id = 1;
+  // 0 = nothing read.
+  uint64 last_read_id = 2;
+  uint32 mention_count = 3;
+  // 0 = no message.
+  uint64 last_message_id = 4;
+}
+
+// Commands.
+
+message SendMessage {
+  uint64 channel_id = 1;
+  optional uint64 thread_id = 2;
+  string content = 3;
+  optional uint64 reply_to = 4;
+  // The sender's own pending attachments, at most 10.
+  repeated uint64 attachment_ids = 5;
+}
+
+message EditMessage {
+  uint64 message_id = 1;
+  string content = 2;
+}
+
+message DeleteMessage {
+  uint64 message_id = 1;
+}
+
+message AddReaction {
+  uint64 message_id = 1;
+  EmojiRef emoji = 2;
+}
+
+message RemoveReaction {
+  uint64 message_id = 1;
+  EmojiRef emoji = 2;
+  // Absent = the actor's own; another's needs MANAGE_MESSAGES.
+  optional uint64 account_id = 3;
+}
+
+message PinMessage {
+  uint64 message_id = 1;
+}
+
+message UnpinMessage {
+  uint64 message_id = 1;
+}
+
+message CreateThread {
+  uint64 message_id = 1;
+  string name = 2;
+}
+
+message UpdateThread {
+  uint64 thread_id = 1;
+  optional string name = 2;
+  optional bool archived = 3;
+}
+
+message MarkRead {
+  uint64 channel_id = 1;
+  // A message of the channel or its threads; 0 = nothing read.
+  uint64 message_id = 2;
+}
+
+message PokeMember {
+  uint64 account_id = 1;
+  optional string text = 2;
+}
+
+message CreateEmoji {
+  string name = 1;
+  // The actor's pending upload_image with purpose EMOJI.
+  uint64 image_id = 2;
+}
+
+message RenameEmoji {
+  uint64 emoji_id = 1;
+  string name = 2;
+}
+
+message DeleteEmoji {
+  uint64 emoji_id = 1;
+}
+
+// Requests.
+
+message MessageHistoryRequest {
+  uint64 channel_id = 1;
+  optional uint64 thread_id = 2;
+  // Absent = the newest messages.
+  oneof anchor {
+    uint64 before = 3;
+    uint64 after = 4;
+    uint64 around = 5;
+  }
+  // 1 to 100.
+  uint32 limit = 6;
+}
+
+message GetMessagesRequest {
+  // 1 to 100.
+  repeated uint64 message_ids = 1;
+}
+
+message ListPinsRequest {
+  uint64 channel_id = 1;
+}
+
+message ListThreadsRequest {
+  uint64 channel_id = 1;
+  bool archived = 2;
+  optional uint64 before_id = 3;
+  // 1 to 100.
+  uint32 limit = 4;
+}
+
+message SearchRequest {
+  string query = 1;
+  optional uint64 before_id = 2;
+  // 1 to 25.
+  uint32 limit = 3;
+}
+
+message UploadAttachmentRequest {
+  bytes data = 1;
+}
+
+message FetchAttachmentRequest {
+  uint64 attachment_id = 1;
+  bool thumbnail = 2;
+}
+
+message AttachmentUrlRequest {
+  uint64 attachment_id = 1;
+  bool thumbnail = 2;
+}
+
+message UploadUrlRequest {
+  uint64 size = 1;
+}
+
+// Responses.
+
+message MessageList {
+  repeated Message messages = 1;
+  bool has_more = 2;
+}
+
+message ThreadList {
+  repeated Thread threads = 1;
+  bool has_more = 2;
+}
+
+// A secret until it expires: never logged.
+message SignedUrl {
+  string url = 1;
+  uint64 expires_at = 2;
+}
+
+message UploadSlot {
+  uint64 attachment_id = 1;
+  // A secret until it expires: never logged.
+  string url = 2;
+  uint64 expires_at = 3;
+}
+
+// Typing.
+
+message StartTyping {
+  uint64 channel_id = 1;
+  optional uint64 thread_id = 2;
+}
+
+// Events.
+
+message MessageCreated {
+  Message message = 1;
+}
+
+// An edit; the message's full form.
+message MessageUpdated {
+  Message message = 1;
+}
+
+message MessageDeleted {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+}
+
+message ReactionAdded {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  EmojiRef emoji = 3;
+  uint64 account_id = 4;
+}
+
+message ReactionRemoved {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  EmojiRef emoji = 3;
+  uint64 account_id = 4;
+}
+
+message MessagePinned {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  uint64 pinned_by = 3;
+}
+
+message MessageUnpinned {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+}
+
+message ThreadCreated {
+  Thread thread = 1;
+}
+
+message ThreadUpdated {
+  Thread thread = 1;
+}
+
+message EmojiCreated {
+  CustomEmoji emoji = 1;
+}
+
+message EmojiUpdated {
+  CustomEmoji emoji = 1;
+}
+
+message EmojiDeleted {
+  uint64 emoji_id = 1;
+}
+
+// Ephemerals.
+
+message Typing {
+  uint64 channel_id = 1;
+  optional uint64 thread_id = 2;
+  uint64 account_id = 3;
+}
+
+message Poke {
+  uint64 from_account_id = 1;
+  string text = 2;
 }
