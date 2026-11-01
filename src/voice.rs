@@ -16,6 +16,8 @@
 //!
 //! The payload is never decoded here or anywhere in the server.
 
+use std::fmt;
+
 use bytes::{BufMut, Bytes, BytesMut};
 
 /// Length of the header.
@@ -54,8 +56,9 @@ pub enum Route {
 }
 
 /// A parsed header. Fields this version ignores (flag bits 0x4 and 0x8,
-/// `reserved`) are not kept; `key_id` is always 0.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// `reserved`) are not kept; `key_id` is always 0. Its `Debug` leaves out
+/// `seq` and `timestamp`, which never go into a log (§ 6.10).
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Header {
     /// End of transmission: the last frame of a burst.
     pub eot: bool,
@@ -69,6 +72,27 @@ pub struct Header {
     pub timestamp: u32,
     /// See the module docs: its meaning depends on the direction and route.
     pub r#ref: u32,
+}
+
+impl fmt::Debug for Header {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            eot,
+            dtx,
+            codec,
+            route,
+            seq: _,
+            timestamp: _,
+            r#ref,
+        } = self;
+        f.debug_struct("Header")
+            .field("eot", eot)
+            .field("dtx", dtx)
+            .field("codec", codec)
+            .field("route", route)
+            .field("ref", r#ref)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Why a datagram was dropped. A counter label only: never logged with the
@@ -164,8 +188,9 @@ impl Header {
 }
 
 /// The copy of a received datagram the server forwards (§ 6.4): `ref`
-/// rewritten to the sender's `session_ref`, the unused flag bits and
-/// `reserved` zeroed, everything else (version, `EOT`, `DTX`, codec, route,
+/// rewritten to the sender's `session_ref`, the unused flag bits, `key_id`
+/// (0 in any valid datagram) and `reserved` zeroed, so only the server can
+/// ever give them a meaning, everything else (version, `EOT`, `DTX`, codec, route,
 /// `seq`, `timestamp` and the payload) byte for byte. One copy per received
 /// datagram, shared by every listener. Call it on a datagram that passed
 /// [`Header::parse`]; `None` only for one shorter than a header.
@@ -175,6 +200,7 @@ pub fn forwarded(datagram: &[u8], sender_ref: u32) -> Option<Bytes> {
     }
     let mut out = BytesMut::from(datagram);
     out[0] &= 0xF0 | KNOWN_FLAGS;
+    out[3] = 0;
     out[REF].copy_from_slice(&sender_ref.to_be_bytes());
     out[14..16].fill(0);
     Some(out.freeze())

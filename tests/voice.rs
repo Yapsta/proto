@@ -52,6 +52,19 @@ fn a_datagram_parses_back_to_its_header_and_keeps_its_payload() {
     assert_eq!(datagram.len(), HEADER_LEN + payload.len());
     assert_eq!(Header::parse(&datagram), Ok(header()));
     assert_eq!(&datagram[HEADER_LEN..], payload);
+    // The other codec, route and flag map back too.
+    let voice = Header {
+        eot: false,
+        dtx: true,
+        codec: Codec::OpusVoice,
+        route: Route::Channel,
+        ..header()
+    };
+    let parsed = Header::parse(&voice.datagram(&payload)).unwrap();
+    assert_eq!(
+        (parsed.eot, parsed.dtx, parsed.codec, parsed.route),
+        (false, true, Codec::OpusVoice, Route::Channel)
+    );
     // A bare header (no payload) is a datagram too.
     assert_eq!(Header::parse(&header().encode()), Ok(header()));
 }
@@ -162,4 +175,16 @@ fn parsing_never_panics_on_arbitrary_bytes() {
         }
     }
     assert!(accepted > 1_000, "the valid-prefix rounds reach acceptance");
+}
+
+#[test]
+fn forwarding_zeroes_key_id_and_debug_leaves_out_seq_and_timestamp() {
+    let mut raw = header().encode();
+    raw[3] = 9;
+    assert_eq!(forwarded(&raw, 1).unwrap()[3], 0);
+    let shown = format!("{:?}", header());
+    assert!(shown.contains("OpusMusic"), "{shown}");
+    for hidden in [header().seq.to_string(), header().timestamp.to_string()] {
+        assert!(!shown.contains(&hidden), "{shown}");
+    }
 }
