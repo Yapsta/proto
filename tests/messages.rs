@@ -1811,6 +1811,7 @@ fn debug_output_names_the_m5_enums() {
     );
     assert!(shown.contains("style: TextFirst"), "{shown}");
 }
+
 #[test]
 fn every_m3_example_carries_its_secrets_only_in_redacted_form() {
     // Each secret is on the wire (so the Debug test above is not vacuous)...
