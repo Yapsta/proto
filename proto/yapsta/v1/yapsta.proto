@@ -109,6 +109,8 @@ message SpacePublicInfo {
   optional uint64 icon_id = 4;
   // The space has an owner; while false only the claim code can be redeemed.
   bool claimed = 5;
+  // M5 (§ 6.11): the style only; the switches are for members.
+  SpaceStyle style = 6;
 }
 
 message Auth {
@@ -383,6 +385,38 @@ message Space {
   // Full form only.
   string rules = 4;
   optional uint64 icon_id = 5;
+  // M5 (§ 6.11), in both forms. Never UNSPECIFIED from a server.
+  SpaceStyle style = 6;
+  bool lobby_on_connect = 7;
+  bool threads = 8;
+  bool reactions = 9;
+  // Presentation only: whether clients show a member panel.
+  bool member_list = 10;
+  VoiceChatAccess voice_chat_access = 11;
+  // Formed per recipient: absent without VIEW_CHANNEL on it.
+  optional uint64 default_voice_channel = 12;
+}
+
+// M5 (§ 6.11): how a space is run; clients lay themselves out by it.
+enum SpaceStyle {
+  SPACE_STYLE_UNSPECIFIED = 0;
+  SPACE_STYLE_VOICE_FIRST = 1;
+  SPACE_STYLE_TEXT_FIRST = 2;
+}
+
+// M5 (§ 6.11): who reads a voice channel's chat.
+enum VoiceChatAccess {
+  VOICE_CHAT_ACCESS_UNSPECIFIED = 0;
+  VOICE_CHAT_ACCESS_MEMBERS_IN_CHANNEL = 1;
+  VOICE_CHAT_ACCESS_CHANNEL_VIEWERS = 2;
+}
+
+// M5 (§ 6.11): the starter templates `apply_template` adds.
+enum StarterTemplate {
+  STARTER_TEMPLATE_UNSPECIFIED = 0;
+  STARTER_TEMPLATE_GAMING = 1;
+  STARTER_TEMPLATE_COMMUNITY = 2;
+  STARTER_TEMPLATE_SMALL_TEAM = 3;
 }
 
 enum ChannelKind {
@@ -573,6 +607,8 @@ message Command {
     DisconnectMember disconnect_member = 47;
     SetWhisperList set_whisper_list = 48;
     ClearWhisperList clear_whisper_list = 49;
+    // M5 (§ 6.11).
+    ApplyTemplate apply_template = 50;
   }
 }
 
@@ -582,6 +618,15 @@ message UpdateSpace {
   optional string name = 1;
   optional string description = 2;
   optional string rules = 3;
+  // M5 (§ 6.11).
+  optional SpaceStyle style = 4;
+  optional bool lobby_on_connect = 5;
+  optional bool threads = 6;
+  optional bool reactions = 7;
+  optional bool member_list = 8;
+  optional VoiceChatAccess voice_chat_access = 9;
+  // 0 clears the default channel.
+  optional uint64 default_voice_channel = 10;
 }
 
 message SetSpaceIcon {
@@ -1061,6 +1106,11 @@ message SetWhisperList {
 
 message ClearWhisperList {
   uint32 list_id = 1;
+}
+
+// M5 (§ 6.11): adds a template's channels, roles and overwrites; removes nothing.
+message ApplyTemplate {
+  StarterTemplate template = 1;
 }
 
 // Requests.

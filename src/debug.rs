@@ -17,9 +17,9 @@ use crate::v1::{
     CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
     InviteCreated, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus, PresenceUpdate,
     Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage, SetChannelPassword, SetNickname,
-    SetPresence, SignedDeviceList, SignedUrl, Space, SpacePublicInfo, Thread, UpdateChannel,
-    UpdateProfile, UpdateRole, UpdateSpace, UpdateThread, UploadAttachmentRequest,
-    UploadImageRequest, UploadSlot, Welcome, emoji_ref, redeem, welcome,
+    SetPresence, SignedDeviceList, SignedUrl, Space, SpacePublicInfo, SpaceStyle, Thread,
+    UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace, UpdateThread, UploadAttachmentRequest,
+    UploadImageRequest, UploadSlot, VoiceChatAccess, Welcome, emoji_ref, redeem, welcome,
 };
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -54,7 +54,9 @@ impl<E: TryFrom<i32> + fmt::Debug> fmt::Debug for Enum<E> {
 /// `Debug` for a message, naming every field (no `..`, so a new field is a
 /// compile error here): `text` shows a string or bytes field's length only,
 /// `opt_text` the same for an optional one, `kind` a `ChannelKind`, `purpose`
-/// an `ImagePurpose`, and a bare field prints as it is.
+/// an `ImagePurpose`, `style` / `access` a `SpaceStyle` / `VoiceChatAccess`
+/// (`opt_style` / `opt_access` the optional ones), and a bare field prints as
+/// it is.
 macro_rules! redacting_debug {
     ($message:ident { $($field:ident $(: $how:ident)?),* $(,)? }) => {
         impl fmt::Debug for $message {
@@ -71,6 +73,10 @@ macro_rules! redacting_debug {
     (@show $field:ident opt_text) => { redacted($field) };
     (@show $field:ident kind) => { known::<ChannelKind>(*$field) };
     (@show $field:ident purpose) => { known::<ImagePurpose>(*$field) };
+    (@show $field:ident style) => { known::<SpaceStyle>(*$field) };
+    (@show $field:ident access) => { known::<VoiceChatAccess>(*$field) };
+    (@show $field:ident opt_style) => { $field.map(known::<SpaceStyle>) };
+    (@show $field:ident opt_access) => { $field.map(known::<VoiceChatAccess>) };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -190,14 +196,22 @@ redacting_debug!(SpacePublicInfo {
     description: text,
     rules: text,
     icon_id,
-    claimed
+    claimed,
+    style: style,
 });
 redacting_debug!(Space {
     owner_account_id,
     name: text,
     description: text,
     rules: text,
-    icon_id
+    icon_id,
+    style: style,
+    lobby_on_connect,
+    threads,
+    reactions,
+    member_list,
+    voice_chat_access: access,
+    default_voice_channel,
 });
 redacting_debug!(Channel {
     id,
@@ -244,7 +258,14 @@ redacting_debug!(BlobData {
 redacting_debug!(UpdateSpace {
     name: opt_text,
     description: opt_text,
-    rules: opt_text
+    rules: opt_text,
+    style: opt_style,
+    lobby_on_connect,
+    threads,
+    reactions,
+    member_list,
+    voice_chat_access: opt_access,
+    default_voice_channel,
 });
 redacting_debug!(CreateChannel {
     kind: kind,
