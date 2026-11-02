@@ -60,6 +60,7 @@ fn channel() -> Channel {
         overwrites: vec![overwrite()],
         retention_days: 0,
         no_history: false,
+        temporary: false,
     }
 }
 
@@ -737,6 +738,168 @@ const M2_SECRETS: &[&str] = &[
     "image/png",
 ];
 
+fn voice_state() -> VoiceState {
+    VoiceState {
+        account_id: 42,
+        channel_id: 5,
+        session_ref: 7,
+        self_mute: true,
+        self_deaf: false,
+        server_mute: true,
+        server_deaf: true,
+        priority: true,
+    }
+}
+
+/// One example of every M4 (§ 6.10) kind and field.
+fn m4_examples() -> Vec<(&'static str, Envelope)> {
+    let env = |request_id, body| Envelope {
+        request_id,
+        last: false,
+        body: Some(body),
+    };
+    let command = |kind| Body::Command(Command { kind: Some(kind) });
+    use command::Kind as C;
+    vec![
+        (
+            "m4_join_voice",
+            env(
+                70,
+                command(C::JoinVoice(JoinVoice {
+                    channel_id: 5,
+                    password: Some("voice-password-text".to_owned()),
+                })),
+            ),
+        ),
+        (
+            "m4_leave_voice",
+            env(71, command(C::LeaveVoice(LeaveVoice {}))),
+        ),
+        (
+            "m4_set_voice_state",
+            env(
+                72,
+                command(C::SetVoiceState(SetVoiceState {
+                    self_mute: Some(true),
+                    self_deaf: Some(false),
+                    priority: Some(true),
+                })),
+            ),
+        ),
+        (
+            "m4_set_member_voice",
+            env(
+                73,
+                command(C::SetMemberVoice(SetMemberVoice {
+                    account_id: 43,
+                    server_mute: Some(true),
+                    server_deaf: Some(false),
+                })),
+            ),
+        ),
+        (
+            "m4_move_member",
+            env(
+                74,
+                command(C::MoveMember(MoveMember {
+                    account_id: 43,
+                    channel_id: 6,
+                })),
+            ),
+        ),
+        (
+            "m4_disconnect_member",
+            env(
+                75,
+                command(C::DisconnectMember(DisconnectMember { account_id: 43 })),
+            ),
+        ),
+        (
+            "m4_set_whisper_list",
+            env(
+                76,
+                command(C::SetWhisperList(SetWhisperList {
+                    list_id: 8,
+                    account_ids: vec![43, 44],
+                    channel_ids: vec![6],
+                    role_ids: vec![2],
+                })),
+            ),
+        ),
+        (
+            "m4_clear_whisper_list",
+            env(
+                77,
+                command(C::ClearWhisperList(ClearWhisperList { list_id: 8 })),
+            ),
+        ),
+        (
+            "m4_create_temporary_channel",
+            env(
+                78,
+                command(C::CreateChannel(CreateChannel {
+                    kind: ChannelKind::Voice.into(),
+                    name: "channel-text".to_owned(),
+                    temporary: Some(true),
+                    ..CreateChannel::default()
+                })),
+            ),
+        ),
+        (
+            "m4_event_voice_state_updated",
+            env(
+                0,
+                Body::Event(Event {
+                    seq: 400,
+                    kind: Some(event::Kind::VoiceStateUpdated(VoiceStateUpdated {
+                        state: Some(voice_state()),
+                        previous_channel_id: 6,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m4_event_temporary_channel_created",
+            env(
+                0,
+                Body::Event(Event {
+                    seq: 401,
+                    kind: Some(event::Kind::ChannelCreated(ChannelCreated {
+                        channel: Some(Channel {
+                            temporary: true,
+                            overwrites: vec![],
+                            ..channel()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m4_ephemeral_voice_session",
+            env(
+                0,
+                Body::Ephemeral(Ephemeral {
+                    kind: Some(ephemeral::Kind::VoiceSession(VoiceSession {
+                        session_ref: 7,
+                        channel_id: 5,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m4_resync_voice_states",
+            env(
+                0,
+                Body::Resync(Snapshot {
+                    seq: 402,
+                    voice_states: vec![voice_state()],
+                    ..Snapshot::default()
+                }),
+            ),
+        ),
+    ]
+}
+
 fn presence() -> PresenceUpdate {
     PresenceUpdate {
         account_id: 42,
@@ -975,6 +1138,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                     }],
                     read_states: vec![],
                     emoji: vec![],
+                    voice_states: vec![],
                 }),
             ),
         ),
@@ -997,6 +1161,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                         max_bitrate: None,
                         retention_days: None,
                         no_history: None,
+                        temporary: None,
                     })),
                 }),
             ),
@@ -1148,6 +1313,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     ]
     .into_iter()
     .chain(m3_examples())
+    .chain(m4_examples())
     .collect()
 }
 
@@ -1246,8 +1412,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 3);
-    assert_eq!(SUPPORTED_MINORS, [3, 2]);
+    assert_eq!(MINOR_VERSION, 4);
+    assert_eq!(SUPPORTED_MINORS, [4, 3]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -1560,6 +1726,22 @@ fn every_m3_example_carries_its_secrets_only_in_redacted_form() {
 }
 
 #[test]
+fn the_join_voice_password_is_on_the_wire_and_only_redacted_in_debug() {
+    let (_, env) = m4_examples()
+        .into_iter()
+        .find(|(n, _)| *n == "m4_join_voice")
+        .unwrap();
+    let secret = "voice-password-text";
+    let bytes = env.encode_to_vec();
+    assert!(bytes.windows(secret.len()).any(|w| w == secret.as_bytes()));
+    for (name, env) in m4_examples() {
+        let shown = format!("{env:?}");
+        assert!(!shown.contains(secret), "{name}: {shown}");
+        assert!(!shown.contains("channel-text"), "{name}: {shown}");
+    }
+}
+
+#[test]
 fn each_body_and_kind_names_the_minor_that_added_it() {
     use yapsta_proto::minor_of;
     let minor = |name: &str| {
@@ -1595,6 +1777,21 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         14 + 9,
         "every M3 command and request kind has an example"
     );
+    // Every M4 command kind is minor 4 (§ 6.7); `create_channel` only gained
+    // the `temporary` field, events, ephemerals and snapshots are server-sent.
+    let mut m4_kinds = 0;
+    for (name, env) in m4_examples() {
+        let body = env.body.unwrap();
+        let expected = match (&body, name) {
+            (_, "m4_create_temporary_channel") => 2,
+            (Body::Command(_), _) => 4,
+            (Body::Resync(_), _) => 2,
+            _ => 1,
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+        m4_kinds += usize::from(expected == 4);
+    }
+    assert_eq!(m4_kinds, 8, "every M4 command kind has an example");
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);

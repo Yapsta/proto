@@ -10,6 +10,7 @@ yapsta.v1.EditMessage
 yapsta.v1.EmojiRef
 yapsta.v1.Error
 yapsta.v1.InviteCreated
+yapsta.v1.JoinVoice
 yapsta.v1.Member
 yapsta.v1.Message
 yapsta.v1.Poke

@@ -15,8 +15,8 @@ use std::marker::PhantomData;
 use crate::v1::{
     BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji, CreateRole,
     CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
-    InviteCreated, Member, Message, Poke, PokeMember, PresenceStatus, PresenceUpdate, Redeem,
-    RenameEmoji, Resume, Role, SearchRequest, SendMessage, SetChannelPassword, SetNickname,
+    InviteCreated, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus, PresenceUpdate,
+    Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage, SetChannelPassword, SetNickname,
     SetPresence, SignedDeviceList, SignedUrl, Space, SpacePublicInfo, Thread, UpdateChannel,
     UpdateProfile, UpdateRole, UpdateSpace, UpdateThread, UploadAttachmentRequest,
     UploadImageRequest, UploadSlot, Welcome, emoji_ref, redeem, welcome,
@@ -215,6 +215,7 @@ redacting_debug!(Channel {
     overwrites,
     retention_days,
     no_history,
+    temporary,
 });
 redacting_debug!(Role {
     id,
@@ -258,6 +259,7 @@ redacting_debug!(CreateChannel {
     max_bitrate,
     retention_days,
     no_history,
+    temporary,
 });
 redacting_debug!(UpdateChannel {
     channel_id,
@@ -272,6 +274,10 @@ redacting_debug!(UpdateChannel {
     no_history,
 });
 redacting_debug!(SetChannelPassword {
+    channel_id,
+    password: opt_text
+});
+redacting_debug!(JoinVoice {
     channel_id,
     password: opt_text
 });
