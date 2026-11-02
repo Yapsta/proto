@@ -22,15 +22,15 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 4 = M4. Minor
+/// The newest minor version this crate defines (§ 6.7): 5 = M5. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 4 must handle the
-/// M4 event, ephemeral and snapshot field (§ 6.3, § 6.10).
-pub const MINOR_VERSION: u32 = 4;
+/// not this constant by default: a client that speaks minor 5 must handle the
+/// M5 space fields and chat in voice channels (§ 6.11).
+pub const MINOR_VERSION: u32 = 5;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 2 (M2) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[4, 3];
+/// The current and the previous one; minor 3 (M3) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[5, 4];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -181,6 +181,7 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::DisconnectMember(_)
         | Kind::SetWhisperList(_)
         | Kind::ClearWhisperList(_) => 4,
+        Kind::ApplyTemplate(_) => 5,
     }
 }
 

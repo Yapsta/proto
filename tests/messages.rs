@@ -71,6 +71,7 @@ fn space() -> Space {
         description: "description-text".to_owned(),
         rules: "rules-text".to_owned(),
         icon_id: Some(76),
+        ..Space::default()
     }
 }
 
@@ -900,6 +901,83 @@ fn m4_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// M5 (§ 6.11): the space style, its switches and starter templates.
+fn m5_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let env = |request_id, body| Envelope {
+        request_id,
+        last: false,
+        body: Some(body),
+    };
+    let command = |kind| Body::Command(Command { kind: Some(kind) });
+    vec![
+        (
+            "m5_apply_template",
+            env(
+                80,
+                command(C::ApplyTemplate(ApplyTemplate {
+                    template: StarterTemplate::Gaming.into(),
+                })),
+            ),
+        ),
+        (
+            "m5_update_space",
+            env(
+                81,
+                command(C::UpdateSpace(UpdateSpace {
+                    style: Some(SpaceStyle::VoiceFirst.into()),
+                    lobby_on_connect: Some(true),
+                    threads: Some(false),
+                    reactions: Some(true),
+                    member_list: Some(false),
+                    voice_chat_access: Some(VoiceChatAccess::MembersInChannel.into()),
+                    default_voice_channel: Some(6),
+                    ..UpdateSpace::default()
+                })),
+            ),
+        ),
+        (
+            "m5_event_space_updated",
+            env(
+                0,
+                Body::Event(Event {
+                    seq: 500,
+                    kind: Some(event::Kind::SpaceUpdated(SpaceUpdated {
+                        space: Some(Space {
+                            style: SpaceStyle::TextFirst.into(),
+                            lobby_on_connect: false,
+                            threads: true,
+                            reactions: true,
+                            member_list: true,
+                            voice_chat_access: VoiceChatAccess::ChannelViewers.into(),
+                            default_voice_channel: Some(6),
+                            ..space()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m5_hello",
+            env(
+                0,
+                Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: vec![5, 4],
+                    challenge: vec![1; 32],
+                    capabilities: vec![],
+                    space_public_info: Some(SpacePublicInfo {
+                        name: "space-text".to_owned(),
+                        claimed: true,
+                        style: SpaceStyle::VoiceFirst.into(),
+                        ..SpacePublicInfo::default()
+                    }),
+                }),
+            ),
+        ),
+    ]
+}
+
 fn presence() -> PresenceUpdate {
     PresenceUpdate {
         account_id: 42,
@@ -1074,6 +1152,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                         rules: "rules-text".to_owned(),
                         icon_id: Some(76),
                         claimed: true,
+                        ..SpacePublicInfo::default()
                     }),
                 }),
             ),
@@ -1314,6 +1393,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .into_iter()
     .chain(m3_examples())
     .chain(m4_examples())
+    .chain(m5_examples())
     .collect()
 }
 
@@ -1412,8 +1492,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 4);
-    assert_eq!(SUPPORTED_MINORS, [4, 3]);
+    assert_eq!(MINOR_VERSION, 5);
+    assert_eq!(SUPPORTED_MINORS, [5, 4]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -1643,6 +1723,7 @@ fn debug_output_redacts_every_patch_command() {
                 name: Some("patch-text".to_owned()),
                 description: Some("patch-text".to_owned()),
                 rules: Some("patch-text".to_owned()),
+                ..UpdateSpace::default()
             }
         ),
         format!(
@@ -1792,6 +1873,16 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         m4_kinds += usize::from(expected == 4);
     }
     assert_eq!(m4_kinds, 8, "every M4 command kind has an example");
+    // M5 adds one command kind (minor 5); `update_space` only gained fields,
+    // which the session gates on their own (§ 6.11 "Minor 5").
+    for (name, expected) in [
+        ("m5_apply_template", 5),
+        ("m5_update_space", 2),
+        ("m5_event_space_updated", 1),
+        ("m5_hello", 1),
+    ] {
+        assert_eq!(minor(name), expected, "{name}");
+    }
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);
