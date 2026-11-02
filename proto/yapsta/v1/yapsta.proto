@@ -114,7 +114,7 @@ message SpacePublicInfo {
 message Auth {
   // The highest entry of Hello.versions the client speaks.
   uint32 version = 1;
-  // How the client proves who it is. M7 adds a bot token beside `device`
+  // How the client proves who it is. M8 adds a bot token beside `device`
   // (§ 6.2); a field never moves into a oneof later (§ 6.7), so the oneof is
   // here from the start.
   oneof credential {
