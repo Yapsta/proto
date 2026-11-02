@@ -1783,6 +1783,34 @@ fn debug_output_redacts_every_patch_command() {
     }
 }
 
+/// The M5 enums print by name, and a value from a newer peer as `Unknown`
+/// (§ 6.11): never a bare number.
+#[test]
+fn debug_output_names_the_m5_enums() {
+    let (_, env) = m5_examples()
+        .into_iter()
+        .find(|(n, _)| *n == "m5_update_space")
+        .unwrap();
+    let shown = format!("{env:?}");
+    assert!(shown.contains("VoiceFirst"), "{shown}");
+    assert!(shown.contains("MembersInChannel"), "{shown}");
+    let newer = Space {
+        style: 99,
+        voice_chat_access: 98,
+        ..Space::default()
+    };
+    let shown = format!("{newer:?}");
+    assert!(shown.contains("style: Unknown(99)"), "{shown}");
+    assert!(shown.contains("voice_chat_access: Unknown(98)"), "{shown}");
+    let shown = format!(
+        "{:?}",
+        SpacePublicInfo {
+            style: SpaceStyle::TextFirst.into(),
+            ..SpacePublicInfo::default()
+        }
+    );
+    assert!(shown.contains("style: TextFirst"), "{shown}");
+}
 #[test]
 fn every_m3_example_carries_its_secrets_only_in_redacted_form() {
     // Each secret is on the wire (so the Debug test above is not vacuous)...

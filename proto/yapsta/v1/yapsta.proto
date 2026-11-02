@@ -618,13 +618,14 @@ message UpdateSpace {
   optional string name = 1;
   optional string description = 2;
   optional string rules = 3;
-  // M5 (§ 6.11). 0 clears the default channel.
+  // M5 (§ 6.11).
   optional SpaceStyle style = 4;
   optional bool lobby_on_connect = 5;
   optional bool threads = 6;
   optional bool reactions = 7;
   optional bool member_list = 8;
   optional VoiceChatAccess voice_chat_access = 9;
+  // 0 clears the default channel.
   optional uint64 default_voice_channel = 10;
 }
 
