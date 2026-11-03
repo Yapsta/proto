@@ -249,6 +249,7 @@ redacting_debug!(Member {
     avatar_id,
     bio: text,
     pronouns: text,
+    timeout_until,
 });
 redacting_debug!(BlobData {
     blob_id,
