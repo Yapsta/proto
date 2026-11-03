@@ -22,15 +22,15 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 5 = M5. Minor
+/// The newest minor version this crate defines (§ 6.7): 6 = M6. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 5 must handle the
-/// M5 space fields and chat in voice channels (§ 6.11).
-pub const MINOR_VERSION: u32 = 5;
+/// not this constant by default: a client that speaks minor 6 must handle the
+/// M6 moderation surface (§ 6.12).
+pub const MINOR_VERSION: u32 = 6;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 3 (M3) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[5, 4];
+/// The current and the previous one; minor 4 (M4) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[6, 5];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -182,6 +182,10 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::SetWhisperList(_)
         | Kind::ClearWhisperList(_) => 4,
         Kind::ApplyTemplate(_) => 5,
+        Kind::KickMember(_)
+        | Kind::BanMember(_)
+        | Kind::UnbanMember(_)
+        | Kind::TimeoutMember(_) => 6,
     }
 }
 
@@ -199,5 +203,6 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         | Kind::FetchAttachment(_)
         | Kind::AttachmentUrl(_)
         | Kind::UploadUrl(_) => 3,
+        Kind::AuditPage(_) | Kind::BanList(_) => 6,
     }
 }
