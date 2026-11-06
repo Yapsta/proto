@@ -128,6 +128,68 @@ pub fn minor_of(body: &v1::envelope::Body) -> u32 {
     }
 }
 
+/// A command kind's name for metrics labels (§ 6.13): its field name in
+/// `Command.kind`. Exhaustive, so a new kind needs its name here.
+pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
+    use v1::command::Kind;
+    match kind {
+        Kind::GetSpace(_) => "get_space",
+        Kind::UpdateSpace(_) => "update_space",
+        Kind::SetSpaceIcon(_) => "set_space_icon",
+        Kind::FetchSpaceIcon(_) => "fetch_space_icon",
+        Kind::CreateChannel(_) => "create_channel",
+        Kind::UpdateChannel(_) => "update_channel",
+        Kind::MoveChannel(_) => "move_channel",
+        Kind::DeleteChannel(_) => "delete_channel",
+        Kind::SetChannelPassword(_) => "set_channel_password",
+        Kind::GetChannel(_) => "get_channel",
+        Kind::CreateRole(_) => "create_role",
+        Kind::UpdateRole(_) => "update_role",
+        Kind::MoveRole(_) => "move_role",
+        Kind::DeleteRole(_) => "delete_role",
+        Kind::AddMemberRole(_) => "add_member_role",
+        Kind::RemoveMemberRole(_) => "remove_member_role",
+        Kind::SetOverwrite(_) => "set_overwrite",
+        Kind::DeleteOverwrite(_) => "delete_overwrite",
+        Kind::GetMember(_) => "get_member",
+        Kind::UpdateProfile(_) => "update_profile",
+        Kind::SetAvatar(_) => "set_avatar",
+        Kind::SetNickname(_) => "set_nickname",
+        Kind::CreateInvite(_) => "create_invite",
+        Kind::ListInvites(_) => "list_invites",
+        Kind::RevokeInvite(_) => "revoke_invite",
+        Kind::TransferMember(_) => "transfer_member",
+        Kind::TransferOwnership(_) => "transfer_ownership",
+        Kind::SendMessage(_) => "send_message",
+        Kind::EditMessage(_) => "edit_message",
+        Kind::DeleteMessage(_) => "delete_message",
+        Kind::AddReaction(_) => "add_reaction",
+        Kind::RemoveReaction(_) => "remove_reaction",
+        Kind::PinMessage(_) => "pin_message",
+        Kind::UnpinMessage(_) => "unpin_message",
+        Kind::CreateThread(_) => "create_thread",
+        Kind::UpdateThread(_) => "update_thread",
+        Kind::MarkRead(_) => "mark_read",
+        Kind::Poke(_) => "poke",
+        Kind::CreateEmoji(_) => "create_emoji",
+        Kind::RenameEmoji(_) => "rename_emoji",
+        Kind::DeleteEmoji(_) => "delete_emoji",
+        Kind::JoinVoice(_) => "join_voice",
+        Kind::LeaveVoice(_) => "leave_voice",
+        Kind::SetVoiceState(_) => "set_voice_state",
+        Kind::SetMemberVoice(_) => "set_member_voice",
+        Kind::MoveMember(_) => "move_member",
+        Kind::DisconnectMember(_) => "disconnect_member",
+        Kind::SetWhisperList(_) => "set_whisper_list",
+        Kind::ClearWhisperList(_) => "clear_whisper_list",
+        Kind::ApplyTemplate(_) => "apply_template",
+        Kind::KickMember(_) => "kick_member",
+        Kind::BanMember(_) => "ban_member",
+        Kind::UnbanMember(_) => "unban_member",
+        Kind::TimeoutMember(_) => "timeout_member",
+    }
+}
+
 /// The minor that introduced a command kind (§ 6.7).
 pub fn command_minor(kind: &v1::command::Kind) -> u32 {
     use v1::command::Kind;
@@ -204,5 +266,54 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         | Kind::AttachmentUrl(_)
         | Kind::UploadUrl(_) => 3,
         Kind::AuditPage(_) | Kind::BanList(_) => 6,
+    }
+}
+
+#[cfg(test)]
+mod kind_name_tests {
+    use std::collections::HashSet;
+
+    use prost::Message;
+
+    use super::*;
+
+    /// Each kind's name is its own field's name in `Command.kind`: a
+    /// one-field `Command` per `oneof kind` line of the proto file, decoded,
+    /// names the field it was encoded with. So the label is what a client
+    /// sees on the wire, and no two kinds share or swap a name.
+    #[test]
+    fn command_kind_names_are_the_field_names() {
+        let proto = include_str!("../proto/yapsta/v1/yapsta.proto");
+        let start = proto.find("message Command {").expect("Command");
+        let oneof = &proto[start..];
+        let oneof = &oneof[oneof.find("oneof kind {").expect("oneof kind")..];
+        let oneof = &oneof[..oneof.find('}').expect("closed")];
+        let mut names = HashSet::new();
+        for line in oneof.lines().skip(1) {
+            // `Type name = N [options]; // comment`
+            let line = line.split("//").next().unwrap_or_default();
+            let line = line.split('[').next().unwrap_or_default().trim();
+            if line.is_empty() {
+                continue;
+            }
+            let (field, number) = line.split_once(" = ").expect(line);
+            let name = field.split_whitespace().nth(1).expect(line);
+            let number: u64 = number.trim_end_matches(';').trim().parse().expect(line);
+            // The field's key (wire type 2, length-delimited) as a varint,
+            // then an empty message.
+            let mut key = (number << 3) | 2;
+            let mut bytes = Vec::new();
+            while key >= 0x80 {
+                bytes.push((key as u8) | 0x80);
+                key >>= 7;
+            }
+            bytes.push(key as u8);
+            bytes.push(0);
+            let command = v1::Command::decode(bytes.as_slice()).expect(line);
+            let kind = command.kind.expect(line);
+            assert_eq!(command_kind_name(&kind), name, "field {number}");
+            assert!(names.insert(name), "{name} twice");
+        }
+        assert!(names.len() >= 50, "{}", names.len());
     }
 }
