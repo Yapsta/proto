@@ -273,83 +273,44 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
 mod kind_name_tests {
     use std::collections::HashSet;
 
+    use prost::Message;
+
     use super::*;
-    use v1::command::Kind;
 
-    /// Every kind, as the proto file lists them.
-    fn every_kind() -> Vec<Kind> {
-        vec![
-            Kind::GetSpace(Default::default()),
-            Kind::UpdateSpace(Default::default()),
-            Kind::SetSpaceIcon(Default::default()),
-            Kind::FetchSpaceIcon(Default::default()),
-            Kind::CreateChannel(Default::default()),
-            Kind::UpdateChannel(Default::default()),
-            Kind::MoveChannel(Default::default()),
-            Kind::DeleteChannel(Default::default()),
-            Kind::SetChannelPassword(Default::default()),
-            Kind::GetChannel(Default::default()),
-            Kind::CreateRole(Default::default()),
-            Kind::UpdateRole(Default::default()),
-            Kind::MoveRole(Default::default()),
-            Kind::DeleteRole(Default::default()),
-            Kind::AddMemberRole(Default::default()),
-            Kind::RemoveMemberRole(Default::default()),
-            Kind::SetOverwrite(Default::default()),
-            Kind::DeleteOverwrite(Default::default()),
-            Kind::GetMember(Default::default()),
-            Kind::UpdateProfile(Default::default()),
-            Kind::SetAvatar(Default::default()),
-            Kind::SetNickname(Default::default()),
-            Kind::CreateInvite(Default::default()),
-            Kind::ListInvites(Default::default()),
-            Kind::RevokeInvite(Default::default()),
-            Kind::TransferMember(Default::default()),
-            Kind::TransferOwnership(Default::default()),
-            Kind::SendMessage(Default::default()),
-            Kind::EditMessage(Default::default()),
-            Kind::DeleteMessage(Default::default()),
-            Kind::AddReaction(Default::default()),
-            Kind::RemoveReaction(Default::default()),
-            Kind::PinMessage(Default::default()),
-            Kind::UnpinMessage(Default::default()),
-            Kind::CreateThread(Default::default()),
-            Kind::UpdateThread(Default::default()),
-            Kind::MarkRead(Default::default()),
-            Kind::Poke(Default::default()),
-            Kind::CreateEmoji(Default::default()),
-            Kind::RenameEmoji(Default::default()),
-            Kind::DeleteEmoji(Default::default()),
-            Kind::JoinVoice(Default::default()),
-            Kind::LeaveVoice(Default::default()),
-            Kind::SetVoiceState(Default::default()),
-            Kind::SetMemberVoice(Default::default()),
-            Kind::MoveMember(Default::default()),
-            Kind::DisconnectMember(Default::default()),
-            Kind::SetWhisperList(Default::default()),
-            Kind::ClearWhisperList(Default::default()),
-            Kind::ApplyTemplate(Default::default()),
-            Kind::KickMember(Default::default()),
-            Kind::BanMember(Default::default()),
-            Kind::UnbanMember(Default::default()),
-            Kind::TimeoutMember(Default::default()),
-        ]
-    }
-
-    /// Each name is distinct, snake_case, and the kind's field name in
-    /// `Command.kind` (so the label is what a client sees on the wire).
+    /// Each kind's name is its own field's name in `Command.kind`: a
+    /// one-field `Command` per `oneof kind` line of the proto file, decoded,
+    /// names the field it was encoded with. So the label is what a client
+    /// sees on the wire, and no two kinds share or swap a name.
     #[test]
     fn command_kind_names_are_the_field_names() {
         let proto = include_str!("../proto/yapsta/v1/yapsta.proto");
-        let kinds = every_kind();
-        let names: HashSet<&str> = kinds.iter().map(command_kind_name).collect();
-        assert_eq!(names.len(), kinds.len());
-        for name in names {
-            assert!(
-                name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
-                "{name}"
+        let start = proto.find("message Command {").expect("Command");
+        let oneof = &proto[start..];
+        let oneof = &oneof[oneof.find("oneof kind {").expect("oneof kind")..];
+        let oneof = &oneof[..oneof.find('}').expect("closed")];
+        let mut names = HashSet::new();
+        for line in oneof.lines().skip(1) {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
+            // `Type name = N;`
+            let (field, number) = line.split_once(" = ").expect(line);
+            let name = field.split_whitespace().nth(1).expect(line);
+            let number: u32 = number.trim_end_matches(';').parse().expect(line);
+            // The field's key (length-delimited), then an empty message.
+            let mut bytes = Vec::new();
+            prost::encoding::encode_key(
+                number,
+                prost::encoding::WireType::LengthDelimited,
+                &mut bytes,
             );
-            assert!(proto.contains(&format!(" {name} = ")), "{name}");
+            bytes.push(0);
+            let command = v1::Command::decode(bytes.as_slice()).expect(line);
+            let kind = command.kind.expect(line);
+            assert_eq!(command_kind_name(&kind), name, "field {number}");
+            assert!(names.insert(name), "{name} twice");
         }
+        assert!(names.len() >= 50, "{}", names.len());
     }
 }
