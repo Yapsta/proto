@@ -550,7 +550,8 @@ message MemberRemoved {
   MemberRemovedReason reason = 2;
 }
 
-// A non-member's redemption (§ 6.2). Codes are secrets: never logged.
+// A non-member's redemption, or from minor 6 a member's claim code while the
+// space has no owner (§ 6.2). Codes are secrets: never logged.
 message Redeem {
   oneof code {
     string claim_code = 1;
