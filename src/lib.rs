@@ -128,6 +128,68 @@ pub fn minor_of(body: &v1::envelope::Body) -> u32 {
     }
 }
 
+/// A command kind's name for metrics labels (§ 6.13): its field name in
+/// `Command.kind`. Exhaustive, so a new kind needs its name here.
+pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
+    use v1::command::Kind;
+    match kind {
+        Kind::GetSpace(_) => "get_space",
+        Kind::UpdateSpace(_) => "update_space",
+        Kind::SetSpaceIcon(_) => "set_space_icon",
+        Kind::FetchSpaceIcon(_) => "fetch_space_icon",
+        Kind::CreateChannel(_) => "create_channel",
+        Kind::UpdateChannel(_) => "update_channel",
+        Kind::MoveChannel(_) => "move_channel",
+        Kind::DeleteChannel(_) => "delete_channel",
+        Kind::SetChannelPassword(_) => "set_channel_password",
+        Kind::GetChannel(_) => "get_channel",
+        Kind::CreateRole(_) => "create_role",
+        Kind::UpdateRole(_) => "update_role",
+        Kind::MoveRole(_) => "move_role",
+        Kind::DeleteRole(_) => "delete_role",
+        Kind::AddMemberRole(_) => "add_member_role",
+        Kind::RemoveMemberRole(_) => "remove_member_role",
+        Kind::SetOverwrite(_) => "set_overwrite",
+        Kind::DeleteOverwrite(_) => "delete_overwrite",
+        Kind::GetMember(_) => "get_member",
+        Kind::UpdateProfile(_) => "update_profile",
+        Kind::SetAvatar(_) => "set_avatar",
+        Kind::SetNickname(_) => "set_nickname",
+        Kind::CreateInvite(_) => "create_invite",
+        Kind::ListInvites(_) => "list_invites",
+        Kind::RevokeInvite(_) => "revoke_invite",
+        Kind::TransferMember(_) => "transfer_member",
+        Kind::TransferOwnership(_) => "transfer_ownership",
+        Kind::SendMessage(_) => "send_message",
+        Kind::EditMessage(_) => "edit_message",
+        Kind::DeleteMessage(_) => "delete_message",
+        Kind::AddReaction(_) => "add_reaction",
+        Kind::RemoveReaction(_) => "remove_reaction",
+        Kind::PinMessage(_) => "pin_message",
+        Kind::UnpinMessage(_) => "unpin_message",
+        Kind::CreateThread(_) => "create_thread",
+        Kind::UpdateThread(_) => "update_thread",
+        Kind::MarkRead(_) => "mark_read",
+        Kind::Poke(_) => "poke",
+        Kind::CreateEmoji(_) => "create_emoji",
+        Kind::RenameEmoji(_) => "rename_emoji",
+        Kind::DeleteEmoji(_) => "delete_emoji",
+        Kind::JoinVoice(_) => "join_voice",
+        Kind::LeaveVoice(_) => "leave_voice",
+        Kind::SetVoiceState(_) => "set_voice_state",
+        Kind::SetMemberVoice(_) => "set_member_voice",
+        Kind::MoveMember(_) => "move_member",
+        Kind::DisconnectMember(_) => "disconnect_member",
+        Kind::SetWhisperList(_) => "set_whisper_list",
+        Kind::ClearWhisperList(_) => "clear_whisper_list",
+        Kind::ApplyTemplate(_) => "apply_template",
+        Kind::KickMember(_) => "kick_member",
+        Kind::BanMember(_) => "ban_member",
+        Kind::UnbanMember(_) => "unban_member",
+        Kind::TimeoutMember(_) => "timeout_member",
+    }
+}
+
 /// The minor that introduced a command kind (§ 6.7).
 pub fn command_minor(kind: &v1::command::Kind) -> u32 {
     use v1::command::Kind;
@@ -204,5 +266,90 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         | Kind::AttachmentUrl(_)
         | Kind::UploadUrl(_) => 3,
         Kind::AuditPage(_) | Kind::BanList(_) => 6,
+    }
+}
+
+#[cfg(test)]
+mod kind_name_tests {
+    use std::collections::HashSet;
+
+    use super::*;
+    use v1::command::Kind;
+
+    /// Every kind, as the proto file lists them.
+    fn every_kind() -> Vec<Kind> {
+        vec![
+            Kind::GetSpace(Default::default()),
+            Kind::UpdateSpace(Default::default()),
+            Kind::SetSpaceIcon(Default::default()),
+            Kind::FetchSpaceIcon(Default::default()),
+            Kind::CreateChannel(Default::default()),
+            Kind::UpdateChannel(Default::default()),
+            Kind::MoveChannel(Default::default()),
+            Kind::DeleteChannel(Default::default()),
+            Kind::SetChannelPassword(Default::default()),
+            Kind::GetChannel(Default::default()),
+            Kind::CreateRole(Default::default()),
+            Kind::UpdateRole(Default::default()),
+            Kind::MoveRole(Default::default()),
+            Kind::DeleteRole(Default::default()),
+            Kind::AddMemberRole(Default::default()),
+            Kind::RemoveMemberRole(Default::default()),
+            Kind::SetOverwrite(Default::default()),
+            Kind::DeleteOverwrite(Default::default()),
+            Kind::GetMember(Default::default()),
+            Kind::UpdateProfile(Default::default()),
+            Kind::SetAvatar(Default::default()),
+            Kind::SetNickname(Default::default()),
+            Kind::CreateInvite(Default::default()),
+            Kind::ListInvites(Default::default()),
+            Kind::RevokeInvite(Default::default()),
+            Kind::TransferMember(Default::default()),
+            Kind::TransferOwnership(Default::default()),
+            Kind::SendMessage(Default::default()),
+            Kind::EditMessage(Default::default()),
+            Kind::DeleteMessage(Default::default()),
+            Kind::AddReaction(Default::default()),
+            Kind::RemoveReaction(Default::default()),
+            Kind::PinMessage(Default::default()),
+            Kind::UnpinMessage(Default::default()),
+            Kind::CreateThread(Default::default()),
+            Kind::UpdateThread(Default::default()),
+            Kind::MarkRead(Default::default()),
+            Kind::Poke(Default::default()),
+            Kind::CreateEmoji(Default::default()),
+            Kind::RenameEmoji(Default::default()),
+            Kind::DeleteEmoji(Default::default()),
+            Kind::JoinVoice(Default::default()),
+            Kind::LeaveVoice(Default::default()),
+            Kind::SetVoiceState(Default::default()),
+            Kind::SetMemberVoice(Default::default()),
+            Kind::MoveMember(Default::default()),
+            Kind::DisconnectMember(Default::default()),
+            Kind::SetWhisperList(Default::default()),
+            Kind::ClearWhisperList(Default::default()),
+            Kind::ApplyTemplate(Default::default()),
+            Kind::KickMember(Default::default()),
+            Kind::BanMember(Default::default()),
+            Kind::UnbanMember(Default::default()),
+            Kind::TimeoutMember(Default::default()),
+        ]
+    }
+
+    /// Each name is distinct, snake_case, and the kind's field name in
+    /// `Command.kind` (so the label is what a client sees on the wire).
+    #[test]
+    fn command_kind_names_are_the_field_names() {
+        let proto = include_str!("../proto/yapsta/v1/yapsta.proto");
+        let kinds = every_kind();
+        let names: HashSet<&str> = kinds.iter().map(command_kind_name).collect();
+        assert_eq!(names.len(), kinds.len());
+        for name in names {
+            assert!(
+                name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+                "{name}"
+            );
+            assert!(proto.contains(&format!(" {name} = ")), "{name}");
+        }
     }
 }
