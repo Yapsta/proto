@@ -290,21 +290,24 @@ mod kind_name_tests {
         let oneof = &oneof[..oneof.find('}').expect("closed")];
         let mut names = HashSet::new();
         for line in oneof.lines().skip(1) {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with("//") {
+            // `Type name = N [options]; // comment`
+            let line = line.split("//").next().unwrap_or_default();
+            let line = line.split('[').next().unwrap_or_default().trim();
+            if line.is_empty() {
                 continue;
             }
-            // `Type name = N;`
             let (field, number) = line.split_once(" = ").expect(line);
             let name = field.split_whitespace().nth(1).expect(line);
-            let number: u32 = number.trim_end_matches(';').parse().expect(line);
-            // The field's key (length-delimited), then an empty message.
+            let number: u64 = number.trim_end_matches(';').trim().parse().expect(line);
+            // The field's key (wire type 2, length-delimited) as a varint,
+            // then an empty message.
+            let mut key = (number << 3) | 2;
             let mut bytes = Vec::new();
-            prost::encoding::encode_key(
-                number,
-                prost::encoding::WireType::LengthDelimited,
-                &mut bytes,
-            );
+            while key >= 0x80 {
+                bytes.push((key as u8) | 0x80);
+                key >>= 7;
+            }
+            bytes.push(key as u8);
             bytes.push(0);
             let command = v1::Command::decode(bytes.as_slice()).expect(line);
             let kind = command.kind.expect(line);
