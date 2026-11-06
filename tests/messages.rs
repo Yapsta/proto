@@ -31,6 +31,7 @@ fn full_member() -> Member {
         avatar_id: Some(77),
         bio: "bio-text".to_owned(),
         pronouns: "pronoun-text".to_owned(),
+        timeout_until: None,
     }
 }
 
@@ -978,6 +979,188 @@ fn m5_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// M6 (§ 6.12): moderation commands, the audit and ban pages, and the fields
+/// M6 adds to `Member` and `MemberRemoved`.
+fn m6_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    use request::Kind as R;
+    let env = |request_id, last, body| Envelope {
+        request_id,
+        last,
+        body: Some(body),
+    };
+    let command = |kind| Body::Command(Command { kind: Some(kind) });
+    let request = |kind| Body::Request(Request { kind: Some(kind) });
+    let response = |kind| Body::Response(Response { kind: Some(kind) });
+    vec![
+        (
+            "m6_kick_member",
+            env(
+                90,
+                false,
+                command(C::KickMember(KickMember { account_id: 43 })),
+            ),
+        ),
+        (
+            "m6_ban_member",
+            env(
+                91,
+                false,
+                command(C::BanMember(BanMember { account_id: 43 })),
+            ),
+        ),
+        (
+            "m6_unban_member",
+            env(
+                92,
+                false,
+                command(C::UnbanMember(UnbanMember { account_id: 43 })),
+            ),
+        ),
+        (
+            "m6_timeout_member",
+            env(
+                93,
+                false,
+                command(C::TimeoutMember(TimeoutMember {
+                    account_id: 43,
+                    until: Some(1_800_003_600),
+                })),
+            ),
+        ),
+        (
+            "m6_timeout_member_clear",
+            env(
+                94,
+                false,
+                command(C::TimeoutMember(TimeoutMember {
+                    account_id: 43,
+                    until: None,
+                })),
+            ),
+        ),
+        (
+            "m6_audit_page_request",
+            env(
+                95,
+                false,
+                request(R::AuditPage(AuditPageRequest {
+                    before: Some(700),
+                    limit: 50,
+                    action: Some(AuditAction::Ban.into()),
+                })),
+            ),
+        ),
+        (
+            "m6_ban_list_request",
+            env(
+                96,
+                false,
+                request(R::BanList(BanListRequest {
+                    before: Some(44),
+                    limit: 100,
+                })),
+            ),
+        ),
+        (
+            "m6_audit_page",
+            env(
+                95,
+                true,
+                response(response::Kind::AuditPage(AuditPage {
+                    entries: vec![
+                        AuditEntry {
+                            id: 699,
+                            at: 1_800_000_100,
+                            actor_kind: ActorKind::Member.into(),
+                            actor_account_id: Some(42),
+                            action: AuditAction::TransferMember.into(),
+                            target_account_id: Some(43),
+                            other_account_id: Some(44),
+                            value: None,
+                        },
+                        AuditEntry {
+                            id: 698,
+                            at: 1_800_000_050,
+                            actor_kind: ActorKind::Operator.into(),
+                            actor_account_id: None,
+                            action: AuditAction::AdminTokenCreate.into(),
+                            target_account_id: None,
+                            other_account_id: None,
+                            value: Some(0x8000_0000_0000_0001),
+                        },
+                    ],
+                    has_more: true,
+                })),
+            ),
+        ),
+        (
+            "m6_ban_page",
+            env(
+                96,
+                true,
+                response(response::Kind::BanPage(BanPage {
+                    bans: vec![
+                        Ban {
+                            account_id: 43,
+                            created_at: 1_800_000_200,
+                        },
+                        Ban {
+                            account_id: 41,
+                            created_at: 1_800_000_100,
+                        },
+                    ],
+                    has_more: false,
+                })),
+            ),
+        ),
+        (
+            "m6_event_member_updated_timeout",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 600,
+                    kind: Some(event::Kind::MemberUpdated(MemberUpdated {
+                        member: Some(Member {
+                            timeout_until: Some(1_800_003_600),
+                            ..full_member()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m6_event_member_removed_banned",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 601,
+                    kind: Some(event::Kind::MemberRemoved(MemberRemoved {
+                        account_id: 43,
+                        reason: MemberRemovedReason::Banned.into(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m6_hello",
+            env(
+                0,
+                false,
+                Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: vec![6, 5],
+                    challenge: vec![1; 32],
+                    capabilities: vec![],
+                    space_public_info: None,
+                }),
+            ),
+        ),
+    ]
+}
+
 fn presence() -> PresenceUpdate {
     PresenceUpdate {
         account_id: 42,
@@ -1372,7 +1555,10 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 false,
                 Body::Event(Event {
                     seq: 203,
-                    kind: Some(event::Kind::MemberRemoved(MemberRemoved { account_id: 43 })),
+                    kind: Some(event::Kind::MemberRemoved(MemberRemoved {
+                        account_id: 43,
+                        ..MemberRemoved::default()
+                    })),
                 }),
             ),
         ),
@@ -1394,6 +1580,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m3_examples())
     .chain(m4_examples())
     .chain(m5_examples())
+    .chain(m6_examples())
     .collect()
 }
 
@@ -1492,8 +1679,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 5);
-    assert_eq!(SUPPORTED_MINORS, [5, 4]);
+    assert_eq!(MINOR_VERSION, 6);
+    assert_eq!(SUPPORTED_MINORS, [6, 5]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -1912,6 +2099,24 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
     ] {
         assert_eq!(minor(name), expected, "{name}");
     }
+    // Every M6 command and request kind is minor 6 (§ 6.12 "Minor 6");
+    // responses, events and the hello are server-sent.
+    let mut m6_kinds = 0;
+    for (name, env) in m6_examples() {
+        let body = env.body.unwrap();
+        let expected = match &body {
+            Body::Command(_) | Body::Request(_) => 6,
+            Body::Response(_) => 2,
+            _ => 1,
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+        m6_kinds += usize::from(expected == 6);
+    }
+    assert_eq!(
+        m6_kinds,
+        5 + 2,
+        "every M6 command and request kind has an example"
+    );
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);
