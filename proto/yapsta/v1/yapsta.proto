@@ -221,6 +221,10 @@ message Event {
     EmojiDeleted emoji_deleted = 25;
     // M4 (§ 6.10).
     VoiceStateUpdated voice_state_updated = 26;
+    // M7 (§ 6.6): to every session that can see the track's channel. Minor 7
+    // only.
+    MediaTrackAdded media_track_added = 27;
+    MediaTrackRemoved media_track_removed = 28;
   }
 }
 
@@ -261,6 +265,9 @@ message Ephemeral {
     // M4 (§ 6.10): to one session, whenever its own voice membership
     // changes.
     VoiceSession voice_session = 6;
+    // M7 (§ 6.6): to the owning session when the server ends its track or
+    // subscription. Minor 7 only.
+    MediaEnded media_ended = 7;
   }
 }
 
@@ -311,6 +318,9 @@ message Snapshot {
   repeated CustomEmoji emoji = 11;
   // M4 (§ 6.10): the states in voice channels this session can see.
   repeated VoiceState voice_states = 12;
+  // M7 (§ 6.6): the live tracks in channels this session can see. Minor 7
+  // only.
+  repeated MediaTrack media_tracks = 13;
 }
 
 message Resumed {
@@ -640,6 +650,12 @@ message Command {
     BanMember ban_member = 52;
     UnbanMember unban_member = 53;
     TimeoutMember timeout_member = 54;
+    // M7 (§ 6.6).
+    PublishMedia publish_media = 55;
+    UnpublishMedia unpublish_media = 56;
+    SubscribeMedia subscribe_media = 57;
+    AnswerMedia answer_media = 58;
+    UnsubscribeMedia unsubscribe_media = 59;
   }
 }
 
@@ -829,6 +845,9 @@ message CommandResult {
     InviteCreated invite_created = 5;
     InviteList invites = 6;
     BlobData blob = 7;
+    // M7 (§ 6.6).
+    MediaPublished media_published = 8;
+    MediaOffer media_offer = 9;
   }
 }
 
@@ -861,6 +880,8 @@ message Request {
     // M6 (§ 6.12).
     AuditPageRequest audit_page = 13;
     BanListRequest ban_list = 14;
+    // M7 (§ 6.6).
+    TurnCredentialsRequest turn_credentials = 15;
   }
 }
 
@@ -901,6 +922,8 @@ message Response {
     // M6 (§ 6.12).
     AuditPage audit_page = 8;
     BanPage ban_page = 9;
+    // M7 (§ 6.6).
+    TurnCredentials turn_credentials = 10;
   }
 }
 
@@ -1437,4 +1460,96 @@ message BanPage {
   // By descending account_id.
   repeated Ban bans = 1;
   bool has_more = 2;
+}
+
+// M7 (§ 6.6): screen share and camera through the server's SFU.
+
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  // A screen: video, plus its audio when the publisher shares it.
+  MEDIA_KIND_SCREEN = 1;
+  // A camera: video only.
+  MEDIA_KIND_CAMERA = 2;
+}
+
+// One published stream. Ids come from one server-wide counter, from 1, never
+// reused while the process runs; never stored.
+message MediaTrack {
+  uint64 media_id = 1;
+  uint64 account_id = 2;
+  uint64 channel_id = 3;
+  MediaKind kind = 4;
+}
+
+message TurnCredentials {
+  repeated string urls = 1;
+  // Secrets: Debug shows their length only.
+  string username = 2;
+  string password = 3;
+  // Unix seconds.
+  uint64 expires_at = 4;
+}
+
+enum MediaEndReason {
+  MEDIA_END_REASON_UNSPECIFIED = 0;
+  MEDIA_END_REASON_LEFT = 1;
+  MEDIA_END_REASON_PERMISSION = 2;
+  MEDIA_END_REASON_MODERATION = 3;
+  MEDIA_END_REASON_FAILED = 4;
+  MEDIA_END_REASON_TRACK_ENDED = 5;
+}
+
+// SDP carries addresses and ICE credentials: Debug shows its length only.
+message PublishMedia {
+  MediaKind kind = 1;
+  // At most 16,384 bytes.
+  string sdp_offer = 2;
+}
+
+message UnpublishMedia {
+  uint64 media_id = 1;
+}
+
+message SubscribeMedia {
+  uint64 media_id = 1;
+}
+
+message AnswerMedia {
+  uint64 subscription_id = 1;
+  // At most 16,384 bytes.
+  string sdp_answer = 2;
+}
+
+message UnsubscribeMedia {
+  uint64 subscription_id = 1;
+}
+
+message MediaPublished {
+  uint64 media_id = 1;
+  string sdp_answer = 2;
+}
+
+message MediaOffer {
+  uint64 subscription_id = 1;
+  uint64 media_id = 2;
+  string sdp_offer = 3;
+}
+
+message TurnCredentialsRequest {}
+
+message MediaTrackAdded {
+  MediaTrack track = 1;
+}
+
+message MediaTrackRemoved {
+  uint64 media_id = 1;
+}
+
+// A MediaEnded without a target is ignored by clients.
+message MediaEnded {
+  oneof target {
+    uint64 media_id = 1;
+    uint64 subscription_id = 2;
+  }
+  MediaEndReason reason = 3;
 }
