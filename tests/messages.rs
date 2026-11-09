@@ -1941,6 +1941,16 @@ fn debug_output_redacts_redeem_codes_invite_codes_and_passwords() {
     // The shape stays: which code it was and how long, and the invite itself.
     assert_eq!(shown[0], "Redeem { code: Some(ClaimCode(<15 bytes>)) }");
     assert_eq!(shown[1], "Redeem { code: Some(InviteCode(<16 bytes>)) }");
+    // M7 (§ 6.14): an open join carries nothing to hide.
+    assert_eq!(
+        format!(
+            "{:?}",
+            Redeem {
+                code: Some(redeem::Code::OpenJoin(OpenJoin {})),
+            }
+        ),
+        "Redeem { code: Some(OpenJoin(OpenJoin)) }"
+    );
     assert!(
         shown[2].contains("uses: 1") && shown[2].contains("code: <16 bytes>"),
         "{}",
