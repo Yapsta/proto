@@ -7,7 +7,9 @@ enum yapsta.v1.AuditAction.AUDIT_ACTION_BACKUP = 10
 enum yapsta.v1.AuditAction.AUDIT_ACTION_BAN = 4
 enum yapsta.v1.AuditAction.AUDIT_ACTION_ERASE = 9
 enum yapsta.v1.AuditAction.AUDIT_ACTION_EXPORT = 8
+enum yapsta.v1.AuditAction.AUDIT_ACTION_JOIN_POLICY_CHANGED = 15
 enum yapsta.v1.AuditAction.AUDIT_ACTION_KICK = 3
+enum yapsta.v1.AuditAction.AUDIT_ACTION_OPEN_JOIN_ROLES_CHANGED = 16
 enum yapsta.v1.AuditAction.AUDIT_ACTION_RESET_OWNER = 14
 enum yapsta.v1.AuditAction.AUDIT_ACTION_RESTORE = 11
 enum yapsta.v1.AuditAction.AUDIT_ACTION_TIMEOUT_CLEAR = 7
@@ -39,6 +41,9 @@ enum yapsta.v1.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION = 10
 enum yapsta.v1.ImagePurpose.IMAGE_PURPOSE_AVATAR = 1
 enum yapsta.v1.ImagePurpose.IMAGE_PURPOSE_EMOJI = 2
 enum yapsta.v1.ImagePurpose.IMAGE_PURPOSE_UNSPECIFIED = 0
+enum yapsta.v1.JoinPolicy.JOIN_POLICY_INVITE_ONLY = 1
+enum yapsta.v1.JoinPolicy.JOIN_POLICY_OPEN = 2
+enum yapsta.v1.JoinPolicy.JOIN_POLICY_UNSPECIFIED = 0
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_BANNED = 3
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_KICKED = 2
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_TRANSFERRED = 1
@@ -459,6 +464,7 @@ field yapsta.v1.ReadState.last_read_id = 2 singular uint64
 field yapsta.v1.ReadState.mention_count = 3 singular uint32
 field yapsta.v1.Redeem.claim_code = 1 singular string oneof code
 field yapsta.v1.Redeem.invite_code = 2 singular string oneof code
+field yapsta.v1.Redeem.open_join = 3 singular .yapsta.v1.OpenJoin oneof code
 field yapsta.v1.RemoveMemberRole.account_id = 1 singular uint64
 field yapsta.v1.RemoveMemberRole.role_id = 2 singular uint64
 field yapsta.v1.RemoveReaction.account_id = 3 optional uint64
@@ -503,6 +509,7 @@ field yapsta.v1.Role.position = 4 singular uint32
 field yapsta.v1.Role.talk_power = 7 singular uint32
 field yapsta.v1.RoleCreated.role = 1 singular .yapsta.v1.Role
 field yapsta.v1.RoleDeleted.role_id = 1 singular uint64
+field yapsta.v1.RoleIdList.role_ids = 1 repeated uint64
 field yapsta.v1.RoleUpdated.role = 1 singular .yapsta.v1.Role
 field yapsta.v1.SearchRequest.before_id = 2 optional uint64
 field yapsta.v1.SearchRequest.limit = 3 singular uint32
@@ -551,9 +558,11 @@ field yapsta.v1.Snapshot.voice_states = 12 repeated .yapsta.v1.VoiceState
 field yapsta.v1.Space.default_voice_channel = 12 optional uint64
 field yapsta.v1.Space.description = 3 singular string
 field yapsta.v1.Space.icon_id = 5 optional uint64
+field yapsta.v1.Space.join_policy = 13 singular .yapsta.v1.JoinPolicy
 field yapsta.v1.Space.lobby_on_connect = 7 singular bool
 field yapsta.v1.Space.member_list = 10 singular bool
 field yapsta.v1.Space.name = 2 singular string
+field yapsta.v1.Space.open_join_role_ids = 14 repeated uint64
 field yapsta.v1.Space.owner_account_id = 1 singular uint64
 field yapsta.v1.Space.reactions = 9 singular bool
 field yapsta.v1.Space.rules = 4 singular string
@@ -563,6 +572,7 @@ field yapsta.v1.Space.voice_chat_access = 11 singular .yapsta.v1.VoiceChatAccess
 field yapsta.v1.SpacePublicInfo.claimed = 5 singular bool
 field yapsta.v1.SpacePublicInfo.description = 2 singular string
 field yapsta.v1.SpacePublicInfo.icon_id = 4 optional uint64
+field yapsta.v1.SpacePublicInfo.join_policy = 7 singular .yapsta.v1.JoinPolicy
 field yapsta.v1.SpacePublicInfo.name = 1 singular string
 field yapsta.v1.SpacePublicInfo.rules = 3 singular string
 field yapsta.v1.SpacePublicInfo.style = 6 singular .yapsta.v1.SpaceStyle
@@ -610,9 +620,11 @@ field yapsta.v1.UpdateRole.role_id = 1 singular uint64
 field yapsta.v1.UpdateRole.talk_power = 6 optional uint32
 field yapsta.v1.UpdateSpace.default_voice_channel = 10 optional uint64
 field yapsta.v1.UpdateSpace.description = 2 optional string
+field yapsta.v1.UpdateSpace.join_policy = 11 optional .yapsta.v1.JoinPolicy
 field yapsta.v1.UpdateSpace.lobby_on_connect = 5 optional bool
 field yapsta.v1.UpdateSpace.member_list = 8 optional bool
 field yapsta.v1.UpdateSpace.name = 1 optional string
+field yapsta.v1.UpdateSpace.open_join_role_ids = 12 optional .yapsta.v1.RoleIdList
 field yapsta.v1.UpdateSpace.reactions = 7 optional bool
 field yapsta.v1.UpdateSpace.rules = 3 optional string
 field yapsta.v1.UpdateSpace.style = 4 optional .yapsta.v1.SpaceStyle
@@ -732,6 +744,7 @@ message yapsta.v1.MessageUpdated
 message yapsta.v1.MoveChannel
 message yapsta.v1.MoveMember
 message yapsta.v1.MoveRole
+message yapsta.v1.OpenJoin
 message yapsta.v1.Overwrite
 message yapsta.v1.OverwriteDeleted
 message yapsta.v1.OverwriteSet
@@ -756,6 +769,7 @@ message yapsta.v1.RevokeInvite
 message yapsta.v1.Role
 message yapsta.v1.RoleCreated
 message yapsta.v1.RoleDeleted
+message yapsta.v1.RoleIdList
 message yapsta.v1.RoleUpdated
 message yapsta.v1.SearchRequest
 message yapsta.v1.SendMessage

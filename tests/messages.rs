@@ -979,6 +979,89 @@ fn m5_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// M7 (§ 6.14): open join. The redeem variant, the `update_space` fields,
+/// and the policy in `Space` and `SpacePublicInfo`.
+fn m7_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let env = |request_id, body| Envelope {
+        request_id,
+        last: false,
+        body: Some(body),
+    };
+    vec![
+        (
+            "m7_redeem_open_join",
+            env(
+                100,
+                Body::Redeem(Redeem {
+                    code: Some(redeem::Code::OpenJoin(OpenJoin {})),
+                }),
+            ),
+        ),
+        (
+            "m7_update_space",
+            env(
+                101,
+                Body::Command(Command {
+                    kind: Some(C::UpdateSpace(UpdateSpace {
+                        join_policy: Some(JoinPolicy::Open.into()),
+                        open_join_role_ids: Some(RoleIdList {
+                            role_ids: vec![2, 3],
+                        }),
+                        ..UpdateSpace::default()
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_update_space_no_roles",
+            env(
+                102,
+                Body::Command(Command {
+                    kind: Some(C::UpdateSpace(UpdateSpace {
+                        open_join_role_ids: Some(RoleIdList { role_ids: vec![] }),
+                        ..UpdateSpace::default()
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_event_space_updated",
+            env(
+                0,
+                Body::Event(Event {
+                    seq: 700,
+                    kind: Some(event::Kind::SpaceUpdated(SpaceUpdated {
+                        space: Some(Space {
+                            join_policy: JoinPolicy::Open.into(),
+                            open_join_role_ids: vec![2, 3],
+                            ..space()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_hello",
+            env(
+                0,
+                Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: vec![7, 6],
+                    challenge: vec![1; 32],
+                    capabilities: vec![],
+                    space_public_info: Some(SpacePublicInfo {
+                        name: "space-text".to_owned(),
+                        claimed: true,
+                        join_policy: JoinPolicy::Open.into(),
+                        ..SpacePublicInfo::default()
+                    }),
+                }),
+            ),
+        ),
+    ]
+}
+
 /// M6 (§ 6.12): moderation commands, the audit and ban pages, and the fields
 /// M6 adds to `Member` and `MemberRemoved`.
 fn m6_examples() -> Vec<(&'static str, Envelope)> {
@@ -1581,6 +1664,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m4_examples())
     .chain(m5_examples())
     .chain(m6_examples())
+    .chain(m7_examples())
     .collect()
 }
 
@@ -1679,8 +1763,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 6);
-    assert_eq!(SUPPORTED_MINORS, [6, 5]);
+    assert_eq!(MINOR_VERSION, 7);
+    assert_eq!(SUPPORTED_MINORS, [7, 6]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -1857,6 +1941,16 @@ fn debug_output_redacts_redeem_codes_invite_codes_and_passwords() {
     // The shape stays: which code it was and how long, and the invite itself.
     assert_eq!(shown[0], "Redeem { code: Some(ClaimCode(<15 bytes>)) }");
     assert_eq!(shown[1], "Redeem { code: Some(InviteCode(<16 bytes>)) }");
+    // M7 (§ 6.14): an open join carries nothing to hide.
+    assert_eq!(
+        format!(
+            "{:?}",
+            Redeem {
+                code: Some(redeem::Code::OpenJoin(OpenJoin {})),
+            }
+        ),
+        "Redeem { code: Some(OpenJoin(OpenJoin)) }"
+    );
     assert!(
         shown[2].contains("uses: 1") && shown[2].contains("code: <16 bytes>"),
         "{}",
@@ -2117,6 +2211,25 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         5 + 2,
         "every M6 command and request kind has an example"
     );
+    // M7 adds a redeem variant (minor 7); `update_space` only gained fields,
+    // which the session gates on their own (§ 6.14, § 6.7 "Minor 7").
+    for (name, expected) in [
+        ("m7_redeem_open_join", 7),
+        ("m7_update_space", 2),
+        ("m7_update_space_no_roles", 2),
+        ("m7_event_space_updated", 1),
+        ("m7_hello", 1),
+    ] {
+        assert_eq!(minor(name), expected, "{name}");
+    }
+    // The older redeem variants stay minor 2.
+    for code in [
+        redeem::Code::ClaimCode("c".to_owned()),
+        redeem::Code::InviteCode("i".to_owned()),
+    ] {
+        assert_eq!(minor_of(&Body::Redeem(Redeem { code: Some(code) })), 2);
+    }
+    assert_eq!(minor_of(&Body::Redeem(Redeem { code: None })), 2);
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);
