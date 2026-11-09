@@ -15,11 +15,12 @@ use std::marker::PhantomData;
 use crate::v1::{
     BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji, CreateRole,
     CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
-    InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus, PresenceUpdate,
-    Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage, SetChannelPassword, SetNickname,
-    SetPresence, SignedDeviceList, SignedUrl, Space, SpacePublicInfo, SpaceStyle, Thread,
-    UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace, UpdateThread, UploadAttachmentRequest,
-    UploadImageRequest, UploadSlot, VoiceChatAccess, Welcome, emoji_ref, redeem, welcome,
+    InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus,
+    PresenceUpdate, Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage,
+    SetChannelPassword, SetNickname, SetPresence, SignedDeviceList, SignedUrl, Space,
+    SpacePublicInfo, SpaceStyle, Thread, UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace,
+    UpdateThread, UploadAttachmentRequest, UploadImageRequest, UploadSlot, VoiceChatAccess,
+    Welcome, emoji_ref, redeem, welcome,
 };
 
 /// Stands in for a redacted value: shows only how long it was.
