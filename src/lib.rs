@@ -191,6 +191,11 @@ pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
         Kind::BanMember(_) => "ban_member",
         Kind::UnbanMember(_) => "unban_member",
         Kind::TimeoutMember(_) => "timeout_member",
+        Kind::PublishMedia(_) => "publish_media",
+        Kind::UnpublishMedia(_) => "unpublish_media",
+        Kind::SubscribeMedia(_) => "subscribe_media",
+        Kind::AnswerMedia(_) => "answer_media",
+        Kind::UnsubscribeMedia(_) => "unsubscribe_media",
     }
 }
 
@@ -252,6 +257,12 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::BanMember(_)
         | Kind::UnbanMember(_)
         | Kind::TimeoutMember(_) => 6,
+        // § 6.6.
+        Kind::PublishMedia(_)
+        | Kind::UnpublishMedia(_)
+        | Kind::SubscribeMedia(_)
+        | Kind::AnswerMedia(_)
+        | Kind::UnsubscribeMedia(_) => 7,
     }
 }
 
@@ -270,6 +281,8 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         | Kind::AttachmentUrl(_)
         | Kind::UploadUrl(_) => 3,
         Kind::AuditPage(_) | Kind::BanList(_) => 6,
+        // § 6.6.
+        Kind::TurnCredentials(_) => 7,
     }
 }
 
