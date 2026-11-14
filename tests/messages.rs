@@ -979,6 +979,291 @@ fn m5_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// M7 (§ 6.14): open join. The redeem variant, the `update_space` fields,
+/// and the policy in `Space` and `SpacePublicInfo`.
+fn m7_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let env = |request_id, body| Envelope {
+        request_id,
+        last: false,
+        body: Some(body),
+    };
+    vec![
+        (
+            "m7_redeem_open_join",
+            env(
+                100,
+                Body::Redeem(Redeem {
+                    code: Some(redeem::Code::OpenJoin(OpenJoin {})),
+                }),
+            ),
+        ),
+        (
+            "m7_update_space",
+            env(
+                101,
+                Body::Command(Command {
+                    kind: Some(C::UpdateSpace(UpdateSpace {
+                        join_policy: Some(JoinPolicy::Open.into()),
+                        open_join_role_ids: Some(RoleIdList {
+                            role_ids: vec![2, 3],
+                        }),
+                        ..UpdateSpace::default()
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_update_space_no_roles",
+            env(
+                102,
+                Body::Command(Command {
+                    kind: Some(C::UpdateSpace(UpdateSpace {
+                        open_join_role_ids: Some(RoleIdList { role_ids: vec![] }),
+                        ..UpdateSpace::default()
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_event_space_updated",
+            env(
+                0,
+                Body::Event(Event {
+                    seq: 700,
+                    kind: Some(event::Kind::SpaceUpdated(SpaceUpdated {
+                        space: Some(Space {
+                            join_policy: JoinPolicy::Open.into(),
+                            open_join_role_ids: vec![2, 3],
+                            ..space()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_hello",
+            env(
+                0,
+                Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: vec![7, 6],
+                    challenge: vec![1; 32],
+                    capabilities: vec![],
+                    space_public_info: Some(SpacePublicInfo {
+                        name: "space-text".to_owned(),
+                        claimed: true,
+                        join_policy: JoinPolicy::Open.into(),
+                        ..SpacePublicInfo::default()
+                    }),
+                }),
+            ),
+        ),
+    ]
+}
+
+/// The SDP and TURN values in [`m7_media_examples`]: none may appear in
+/// `Debug` output.
+const M7_SECRETS: &[&str] = &[
+    "v=0 o=- publish-offer",
+    "v=0 o=- publish-answer",
+    "v=0 o=- subscribe-offer",
+    "v=0 o=- subscribe-answer",
+    "turn:turn.example.org:3478",
+    "turn-user-text",
+    "turn-password-text",
+];
+
+fn media_track() -> MediaTrack {
+    MediaTrack {
+        media_id: 7,
+        account_id: 42,
+        channel_id: 9,
+        kind: MediaKind::Screen.into(),
+    }
+}
+
+/// M7 (§ 6.6): the media signalling commands, replies, request, response,
+/// events, ephemeral and snapshot field.
+fn m7_media_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let env = |request_id, last, body| Envelope {
+        request_id,
+        last,
+        body: Some(body),
+    };
+    let command = |request_id, kind| {
+        env(
+            request_id,
+            false,
+            Body::Command(Command { kind: Some(kind) }),
+        )
+    };
+    vec![
+        (
+            "m7_publish_media",
+            command(
+                110,
+                C::PublishMedia(PublishMedia {
+                    kind: MediaKind::Screen.into(),
+                    sdp_offer: M7_SECRETS[0].to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m7_publish_media_camera",
+            command(
+                111,
+                C::PublishMedia(PublishMedia {
+                    kind: MediaKind::Camera.into(),
+                    sdp_offer: M7_SECRETS[0].to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m7_unpublish_media",
+            command(112, C::UnpublishMedia(UnpublishMedia { media_id: 7 })),
+        ),
+        (
+            "m7_subscribe_media",
+            command(113, C::SubscribeMedia(SubscribeMedia { media_id: 7 })),
+        ),
+        (
+            "m7_answer_media",
+            command(
+                114,
+                C::AnswerMedia(AnswerMedia {
+                    subscription_id: 8,
+                    sdp_answer: M7_SECRETS[3].to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m7_unsubscribe_media",
+            command(
+                115,
+                C::UnsubscribeMedia(UnsubscribeMedia { subscription_id: 8 }),
+            ),
+        ),
+        (
+            "m7_media_published",
+            env(
+                110,
+                false,
+                Body::CommandResult(CommandResult {
+                    kind: Some(command_result::Kind::MediaPublished(MediaPublished {
+                        media_id: 7,
+                        sdp_answer: M7_SECRETS[1].to_owned(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_media_offer",
+            env(
+                113,
+                false,
+                Body::CommandResult(CommandResult {
+                    kind: Some(command_result::Kind::MediaOffer(MediaOffer {
+                        subscription_id: 8,
+                        media_id: 7,
+                        sdp_offer: M7_SECRETS[2].to_owned(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_turn_credentials_request",
+            env(
+                116,
+                false,
+                Body::Request(Request {
+                    kind: Some(request::Kind::TurnCredentials(TurnCredentialsRequest {})),
+                }),
+            ),
+        ),
+        (
+            "m7_turn_credentials",
+            env(
+                116,
+                true,
+                Body::Response(Response {
+                    kind: Some(response::Kind::TurnCredentials(TurnCredentials {
+                        urls: vec![M7_SECRETS[4].to_owned()],
+                        username: M7_SECRETS[5].to_owned(),
+                        password: M7_SECRETS[6].to_owned(),
+                        expires_at: 1_800_000_000,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_event_media_track_added",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 710,
+                    kind: Some(event::Kind::MediaTrackAdded(MediaTrackAdded {
+                        track: Some(media_track()),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_event_media_track_removed",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 711,
+                    kind: Some(event::Kind::MediaTrackRemoved(MediaTrackRemoved {
+                        media_id: 7,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_media_ended_track",
+            env(
+                0,
+                false,
+                Body::Ephemeral(Ephemeral {
+                    kind: Some(ephemeral::Kind::MediaEnded(MediaEnded {
+                        target: Some(media_ended::Target::MediaId(7)),
+                        reason: MediaEndReason::Moderation.into(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_media_ended_subscription",
+            env(
+                0,
+                false,
+                Body::Ephemeral(Ephemeral {
+                    kind: Some(ephemeral::Kind::MediaEnded(MediaEnded {
+                        target: Some(media_ended::Target::SubscriptionId(8)),
+                        reason: MediaEndReason::TrackEnded.into(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m7_resync_media_tracks",
+            env(
+                0,
+                false,
+                Body::Resync(Snapshot {
+                    seq: 712,
+                    media_tracks: vec![media_track()],
+                    ..Snapshot::default()
+                }),
+            ),
+        ),
+    ]
+}
+
 /// M6 (§ 6.12): moderation commands, the audit and ban pages, and the fields
 /// M6 adds to `Member` and `MemberRemoved`.
 fn m6_examples() -> Vec<(&'static str, Envelope)> {
@@ -1401,6 +1686,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                     read_states: vec![],
                     emoji: vec![],
                     voice_states: vec![],
+                    media_tracks: vec![],
                 }),
             ),
         ),
@@ -1581,6 +1867,8 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m4_examples())
     .chain(m5_examples())
     .chain(m6_examples())
+    .chain(m7_examples())
+    .chain(m7_media_examples())
     .collect()
 }
 
@@ -1679,8 +1967,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 6);
-    assert_eq!(SUPPORTED_MINORS, [6, 5]);
+    assert_eq!(MINOR_VERSION, 7);
+    assert_eq!(SUPPORTED_MINORS, [7, 6]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -1699,6 +1987,7 @@ fn debug_output_redacts_secrets_and_user_text() {
         .iter()
         .chain(M2_SECRETS)
         .chain(M3_SECRETS)
+        .chain(M7_SECRETS)
     {
         assert!(!env.contains(text), "{text} in {env}");
     }
@@ -1857,6 +2146,16 @@ fn debug_output_redacts_redeem_codes_invite_codes_and_passwords() {
     // The shape stays: which code it was and how long, and the invite itself.
     assert_eq!(shown[0], "Redeem { code: Some(ClaimCode(<15 bytes>)) }");
     assert_eq!(shown[1], "Redeem { code: Some(InviteCode(<16 bytes>)) }");
+    // M7 (§ 6.14): an open join carries nothing to hide.
+    assert_eq!(
+        format!(
+            "{:?}",
+            Redeem {
+                code: Some(redeem::Code::OpenJoin(OpenJoin {})),
+            }
+        ),
+        "Redeem { code: Some(OpenJoin(OpenJoin)) }"
+    );
     assert!(
         shown[2].contains("uses: 1") && shown[2].contains("code: <16 bytes>"),
         "{}",
@@ -2038,6 +2337,60 @@ fn the_join_voice_password_is_on_the_wire_and_only_redacted_in_debug() {
     }
 }
 
+/// § 6.6 "Privacy and logs": SDP (addresses, ports, ICE credentials) and
+/// TURN credentials travel on the wire but `Debug` shows their lengths only,
+/// decoded from bytes as a peer would send them; the ids and enums still show.
+#[test]
+fn media_sdp_and_turn_credentials_are_only_redacted_in_debug() {
+    for (name, env) in m7_media_examples() {
+        let bytes = env.encode_to_vec();
+        let decoded = Envelope::decode(bytes.as_slice()).unwrap();
+        let shown = format!("{decoded:?}");
+        for secret in M7_SECRETS {
+            assert!(!shown.contains(secret), "{name}: {secret} in {shown}");
+        }
+        let carried: Vec<_> = M7_SECRETS
+            .iter()
+            .filter(|s| bytes.windows(s.len()).any(|w| w == s.as_bytes()))
+            .collect();
+        let expected = match name {
+            "m7_publish_media" | "m7_publish_media_camera" => vec![&M7_SECRETS[0]],
+            "m7_answer_media" => vec![&M7_SECRETS[3]],
+            "m7_media_published" => vec![&M7_SECRETS[1]],
+            "m7_media_offer" => vec![&M7_SECRETS[2]],
+            "m7_turn_credentials" => M7_SECRETS[4..].iter().collect(),
+            _ => vec![],
+        };
+        assert_eq!(carried, expected, "{name}: on the wire");
+        for secret in carried {
+            assert!(
+                shown.contains(&format!("<{} bytes>", secret.len())),
+                "{name}: {shown}"
+            );
+        }
+    }
+    let shown = |name: &str| {
+        let (_, env) = m7_media_examples()
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .unwrap();
+        format!("{env:?}")
+    };
+    assert!(shown("m7_publish_media").contains("kind: Screen"));
+    assert!(shown("m7_publish_media_camera").contains("kind: Camera"));
+    assert!(shown("m7_answer_media").contains("subscription_id: 8"));
+    assert!(shown("m7_media_published").contains("media_id: 7"));
+    let offer = shown("m7_media_offer");
+    assert!(offer.contains("subscription_id: 8") && offer.contains("media_id: 7"));
+    assert!(shown("m7_turn_credentials").contains("expires_at: 1800000000"));
+    // A kind from a newer peer shows its number.
+    let newer = PublishMedia {
+        kind: 99,
+        sdp_offer: String::new(),
+    };
+    assert!(format!("{newer:?}").contains("Unknown(99)"), "{newer:?}");
+}
+
 #[test]
 fn each_body_and_kind_names_the_minor_that_added_it() {
     use yapsta_proto::minor_of;
@@ -2117,6 +2470,44 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         5 + 2,
         "every M6 command and request kind has an example"
     );
+    // M7 adds a redeem variant (minor 7); `update_space` only gained fields,
+    // which the session gates on their own (§ 6.14, § 6.7 "Minor 7").
+    for (name, expected) in [
+        ("m7_redeem_open_join", 7),
+        ("m7_update_space", 2),
+        ("m7_update_space_no_roles", 2),
+        ("m7_event_space_updated", 1),
+        ("m7_hello", 1),
+    ] {
+        assert_eq!(minor(name), expected, "{name}");
+    }
+    // Every M7 media command and request kind is minor 7 (§ 6.6, § 6.7
+    // "Minor 7"); replies, responses, events, ephemerals and the snapshot are
+    // server-sent.
+    let mut media_kinds = 0;
+    for (name, env) in m7_media_examples() {
+        let body = env.body.unwrap();
+        let expected = match &body {
+            Body::Command(_) | Body::Request(_) => 7,
+            Body::CommandResult(_) | Body::Response(_) | Body::Resync(_) => 2,
+            _ => 1,
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+        media_kinds += usize::from(expected == 7);
+    }
+    assert_eq!(
+        media_kinds,
+        6 + 1,
+        "every M7 media command and request kind has an example"
+    );
+    // The older redeem variants stay minor 2.
+    for code in [
+        redeem::Code::ClaimCode("c".to_owned()),
+        redeem::Code::InviteCode("i".to_owned()),
+    ] {
+        assert_eq!(minor_of(&Body::Redeem(Redeem { code: Some(code) })), 2);
+    }
+    assert_eq!(minor_of(&Body::Redeem(Redeem { code: None })), 2);
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);

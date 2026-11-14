@@ -22,15 +22,15 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 6 = M6. Minor
+/// The newest minor version this crate defines (§ 6.7): 7 = M7. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 6 must handle the
-/// M6 moderation surface (§ 6.12).
-pub const MINOR_VERSION: u32 = 6;
+/// not this constant by default: a client that speaks minor 7 must handle the
+/// M7 surface (open join, § 6.14).
+pub const MINOR_VERSION: u32 = 7;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 4 (M4) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[6, 5];
+/// The current and the previous one; minor 5 (M5) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[7, 6];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -121,6 +121,10 @@ pub fn minor_of(body: &v1::envelope::Body) -> u32 {
         | Body::SetPresence(_)
         | Body::Ack(_)
         | Body::Ping(_) => 1,
+        // § 6.14: the open-join variant is minor 7; the codes are minor 2.
+        Body::Redeem(v1::Redeem {
+            code: Some(v1::redeem::Code::OpenJoin(_)),
+        }) => 7,
         Body::Redeem(_) | Body::Resync(_) | Body::CommandResult(_) | Body::Response(_) => 2,
         Body::Command(command) => command.kind.as_ref().map_or(2, command_minor),
         Body::Request(request) => request.kind.as_ref().map_or(2, request_minor),
@@ -187,6 +191,11 @@ pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
         Kind::BanMember(_) => "ban_member",
         Kind::UnbanMember(_) => "unban_member",
         Kind::TimeoutMember(_) => "timeout_member",
+        Kind::PublishMedia(_) => "publish_media",
+        Kind::UnpublishMedia(_) => "unpublish_media",
+        Kind::SubscribeMedia(_) => "subscribe_media",
+        Kind::AnswerMedia(_) => "answer_media",
+        Kind::UnsubscribeMedia(_) => "unsubscribe_media",
     }
 }
 
@@ -248,6 +257,12 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::BanMember(_)
         | Kind::UnbanMember(_)
         | Kind::TimeoutMember(_) => 6,
+        // § 6.6.
+        Kind::PublishMedia(_)
+        | Kind::UnpublishMedia(_)
+        | Kind::SubscribeMedia(_)
+        | Kind::AnswerMedia(_)
+        | Kind::UnsubscribeMedia(_) => 7,
     }
 }
 
@@ -266,6 +281,8 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         | Kind::AttachmentUrl(_)
         | Kind::UploadUrl(_) => 3,
         Kind::AuditPage(_) | Kind::BanList(_) => 6,
+        // § 6.6.
+        Kind::TurnCredentials(_) => 7,
     }
 }
 

@@ -13,14 +13,16 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use crate::v1::{
-    BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji, CreateRole,
-    CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
-    InviteCreated, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus, PresenceUpdate,
-    Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage, SetChannelPassword, SetNickname,
-    SetPresence, SignedDeviceList, SignedUrl, Space, SpacePublicInfo, SpaceStyle, Thread,
-    UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace, UpdateThread, UploadAttachmentRequest,
-    UploadImageRequest, UploadSlot, VoiceChatAccess, Welcome, emoji_ref, redeem, welcome,
+    AnswerMedia, BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji,
+    CreateRole, CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
+    InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus,
+    PresenceUpdate, Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage,
+    SetChannelPassword, SetNickname, SetPresence, SignedDeviceList, SignedUrl, Space,
+    SpacePublicInfo, SpaceStyle, Thread, UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace,
+    UpdateThread, UploadAttachmentRequest, UploadImageRequest, UploadSlot, VoiceChatAccess,
+    Welcome, emoji_ref, redeem, welcome,
 };
+use crate::v1::{MediaKind, MediaOffer, MediaPublished, PublishMedia, TurnCredentials};
 
 /// Stands in for a redacted value: shows only how long it was.
 struct Redacted(usize);
@@ -77,6 +79,10 @@ macro_rules! redacting_debug {
     (@show $field:ident access) => { known::<VoiceChatAccess>(*$field) };
     (@show $field:ident opt_style) => { $field.map(known::<SpaceStyle>) };
     (@show $field:ident opt_access) => { $field.map(known::<VoiceChatAccess>) };
+    (@show $field:ident policy) => { known::<JoinPolicy>(*$field) };
+    (@show $field:ident opt_policy) => { $field.map(known::<JoinPolicy>) };
+    (@show $field:ident media) => { known::<MediaKind>(*$field) };
+    (@show $field:ident texts) => { $field.iter().map(|t| Redacted(t.len())).collect::<Vec<_>>() };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -198,6 +204,7 @@ redacting_debug!(SpacePublicInfo {
     icon_id,
     claimed,
     style: style,
+    join_policy: policy,
 });
 redacting_debug!(Space {
     owner_account_id,
@@ -212,6 +219,8 @@ redacting_debug!(Space {
     member_list,
     voice_chat_access: access,
     default_voice_channel,
+    join_policy: policy,
+    open_join_role_ids,
 });
 redacting_debug!(Channel {
     id,
@@ -267,6 +276,8 @@ redacting_debug!(UpdateSpace {
     member_list,
     voice_chat_access: opt_access,
     default_voice_channel,
+    join_policy: opt_policy,
+    open_join_role_ids,
 });
 redacting_debug!(CreateChannel {
     kind: kind,
@@ -339,6 +350,8 @@ impl fmt::Debug for redeem::Code {
         let (name, code) = match self {
             Self::ClaimCode(code) => ("ClaimCode", code),
             Self::InviteCode(code) => ("InviteCode", code),
+            // No secret: OpenJoin is empty (§ 6.14).
+            Self::OpenJoin(open) => return f.debug_tuple("OpenJoin").field(open).finish(),
         };
         f.debug_tuple(name).field(&Redacted(code.len())).finish()
     }
@@ -441,4 +454,32 @@ redacting_debug!(UploadSlot {
 redacting_debug!(Poke {
     from_account_id,
     text: text
+});
+
+// M7 (§ 6.6): SDP carries addresses, ports, ICE credentials and the DTLS
+// fingerprint; TURN credentials are secrets. Lengths only. The TURN URLs name
+// the operator's TURN host, not a peer's, but are shown as lengths too: a
+// stray `{:?}` has no use for them.
+redacting_debug!(PublishMedia {
+    kind: media,
+    sdp_offer: text,
+});
+redacting_debug!(AnswerMedia {
+    subscription_id,
+    sdp_answer: text,
+});
+redacting_debug!(MediaPublished {
+    media_id,
+    sdp_answer: text,
+});
+redacting_debug!(MediaOffer {
+    subscription_id,
+    media_id,
+    sdp_offer: text,
+});
+redacting_debug!(TurnCredentials {
+    urls: texts,
+    username: text,
+    password: text,
+    expires_at,
 });
