@@ -37,6 +37,10 @@ pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
 
 /// Largest frame on a QUIC request stream (§ 6.1).
 pub const MAX_REQUEST_FRAME: usize = 16 * 1024 * 1024;
+/// Largest frame a client may send before its `Welcome`, and on a
+/// non-member session (§ 6.1, § 6.16). The largest legal `Auth` is under
+/// 18 KiB.
+pub const MAX_RESTRICTED_FRAME: usize = 32 * 1024;
 
 /// An error or close code as received. A newer peer can send codes this
 /// version does not know; those are errors, never a normal close.
