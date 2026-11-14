@@ -387,3 +387,35 @@ fn the_redaction_lists_name_real_messages_and_fields() {
         );
     }
 }
+
+/// Every `Envelope` body field is placed on purpose as a server's or a
+/// client's (§ 6.16): a server refuses a client frame carrying a
+/// server-only body before decoding it, so a new body must say which it is.
+#[test]
+fn every_envelope_body_is_a_servers_or_a_clients() {
+    use yapsta_proto::frame::{CLIENT_BODIES, SERVER_ONLY_BODIES};
+    let set = descriptors();
+    let envelope = set
+        .file
+        .iter()
+        .flat_map(|f| &f.message_type)
+        .find(|m| m.name() == "Envelope")
+        .expect("Envelope");
+    let bodies: BTreeSet<i32> = envelope
+        .field
+        .iter()
+        .filter(|f| f.oneof_index.is_some())
+        .map(|f| f.number())
+        .collect();
+    let placed: BTreeSet<i32> = SERVER_ONLY_BODIES
+        .iter()
+        .chain(CLIENT_BODIES.iter())
+        .map(|&n| i32::try_from(n).unwrap())
+        .collect();
+    assert_eq!(
+        placed.len(),
+        SERVER_ONLY_BODIES.len() + CLIENT_BODIES.len(),
+        "a body in both lists"
+    );
+    assert_eq!(bodies, placed, "every body field in exactly one list");
+}

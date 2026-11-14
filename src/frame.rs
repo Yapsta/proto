@@ -14,7 +14,12 @@ use crate::{MAX_CONTROL_FRAME, MAX_REQUEST_FRAME};
 /// `hello`, `welcome`, `event`, `ephemeral`, `ack`, `resync`,
 /// `command_result`, `response`. A server refuses a client frame carrying
 /// any of them before decoding it.
-const SERVER_ONLY_BODIES: [u32; 9] = [3, 4, 6, 7, 8, 10, 13, 15, 17];
+pub const SERVER_ONLY_BODIES: [u32; 9] = [3, 4, 6, 7, 8, 10, 13, 15, 17];
+/// `Envelope` body fields a client sends: `auth`, `set_presence`, `ping`,
+/// `redeem`, `command`, `request`, `start_typing`. Every body field is in
+/// exactly one of the two lists (a wire-surface test holds that), so a new
+/// one is placed on purpose.
+pub const CLIENT_BODIES: [u32; 7] = [5, 9, 11, 12, 14, 16, 18];
 
 const PREFIX: usize = 4;
 /// The most the decoder asks to reserve ahead of the bytes received. `BytesMut`
@@ -57,6 +62,9 @@ pub struct FrameCodec {
     /// A server reading a client: frames carrying a server-only body are
     /// refused before they are decoded.
     from_client: bool,
+    /// Set when the last frame was refused for a server-only body, so the
+    /// reader can count it apart from one that does not decode.
+    refused_server_body: bool,
 }
 
 impl FrameCodec {
@@ -78,6 +86,7 @@ impl FrameCodec {
             max,
             max_in: max,
             from_client: false,
+            refused_server_body: false,
         }
     }
 
@@ -89,6 +98,17 @@ impl FrameCodec {
             from_client: true,
             ..Self::control()
         }
+    }
+
+    /// Whether the last refused frame carried a server-only body; clears
+    /// the mark.
+    pub fn take_refused_server_body(&mut self) -> bool {
+        std::mem::take(&mut self.refused_server_body)
+    }
+
+    /// Whether frames are decoded under [`MAX_RESTRICTED_FRAME`](crate::MAX_RESTRICTED_FRAME).
+    pub fn restricted(&self) -> bool {
+        self.max_in < self.max
     }
 
     /// Restricts (or, with `false`, frees) what is decoded to
@@ -106,7 +126,7 @@ impl FrameCodec {
 /// Whether `body` (an encoded `Envelope`) carries a field only a server
 /// sends. Walks the top-level tags only, skipping each value; a malformed
 /// frame is left for the decoder to refuse.
-fn carries_server_body(mut body: &[u8]) -> bool {
+pub fn carries_server_body(mut body: &[u8]) -> bool {
     use prost::encoding::{DecodeContext, decode_key, skip_field};
     while !body.is_empty() {
         let Ok((tag, wire_type)) = decode_key(&mut body) else {
@@ -151,6 +171,7 @@ impl Decoder for FrameCodec {
         src.advance(PREFIX);
         let body = src.split_to(len);
         if self.from_client && carries_server_body(&body) {
+            self.refused_server_body = true;
             return Err(FrameError::Invalid);
         }
         Envelope::decode(body.freeze())
@@ -442,10 +463,14 @@ mod tests {
             Err(FrameError::TooLarge { max, .. }) if max == crate::MAX_RESTRICTED_FRAME
         ));
         assert_eq!(buf.len(), before, "nothing consumed");
-        // Freed, the same length is within the 1 MiB limit again.
+        // Freed, a frame past the restricted cap decodes again.
         codec.restrict(false);
-        let mut buf = raw_frame(&[]);
-        assert!(codec.decode(&mut buf).unwrap().is_some());
+        let mut padded = vec![1 << 3, 7];
+        prost::encoding::encode_key(99, prost::encoding::WireType::LengthDelimited, &mut padded);
+        prost::encoding::encode_varint(crate::MAX_RESTRICTED_FRAME as u64, &mut padded);
+        padded.resize(padded.len() + crate::MAX_RESTRICTED_FRAME, 0);
+        let mut buf = raw_frame(&padded);
+        assert_eq!(codec.decode(&mut buf).unwrap().unwrap().request_id, 7);
     }
 
     #[test]
@@ -455,6 +480,8 @@ mod tests {
         // members. Decoded, it would expand to some 100 MiB of `Member`s.
         let mut buf = raw_frame(&member_packed(500_000));
         assert!(matches!(codec.decode(&mut buf), Err(FrameError::Invalid)));
+        assert!(codec.take_refused_server_body(), "marked as a server body");
+        assert!(!codec.take_refused_server_body(), "the mark is taken once");
         // Every server-only body, even empty, and one hidden behind other
         // fields (a later oneof field wins in protobuf).
         for tag in SERVER_ONLY_BODIES {
