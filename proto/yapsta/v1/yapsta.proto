@@ -118,17 +118,28 @@ message SpacePublicInfo {
 message Auth {
   // The highest entry of Hello.versions the client speaks.
   uint32 version = 1;
-  // How the client proves who it is. M8 adds a bot token beside `device`
-  // (§ 6.2); a field never moves into a oneof later (§ 6.7), so the oneof is
-  // here from the start.
+  // How the client proves who it is: a person's device, or from M8 a bot
+  // (§ 6.15); a field never moves into a oneof later (§ 6.7), so the oneof
+  // was here from the start.
   oneof credential {
     DeviceCredential device = 2;
+    // M8 (§ 6.15): needs `version` 8 or later.
+    BotCredential bot = 7;
   }
   repeated Capability capabilities = 3;
   ClientInfo client_info = 4;
   // The initial account status (§ 6.3).
   optional PresenceStatus presence = 5;
   optional Resume resume = 6;
+}
+
+// A bot (§ 6.15, M8): its key, derived from the seed shown at creation, and
+// its Ed25519 signature over the bot Auth transcript (§ 6.2).
+message BotCredential {
+  // 32 bytes.
+  bytes bot_pub = 1;
+  // 64 bytes.
+  bytes signature = 2;
 }
 
 // A person's device (§ 6.2).
@@ -248,6 +259,8 @@ message Member {
   // M6 (§ 6.12), in both forms: present while the timeout is in the future
   // when the message is built. Clients compare it with their clock.
   optional uint64 timeout_until = 9;
+  // M8 (§ 6.15), in both forms: the account is a bot.
+  bool bot = 10;
 }
 
 message Ephemeral {
@@ -656,6 +669,10 @@ message Command {
     SubscribeMedia subscribe_media = 57;
     AnswerMedia answer_media = 58;
     UnsubscribeMedia unsubscribe_media = 59;
+    // M8 (§ 6.15).
+    CreateBot create_bot = 60;
+    RotateBot rotate_bot = 61;
+    DeleteBot delete_bot = 62;
   }
 }
 
@@ -848,6 +865,8 @@ message CommandResult {
     // M7 (§ 6.6).
     MediaPublished media_published = 8;
     MediaOffer media_offer = 9;
+    // M8 (§ 6.15).
+    BotCreated bot_created = 10;
   }
 }
 
@@ -882,6 +901,8 @@ message Request {
     BanListRequest ban_list = 14;
     // M7 (§ 6.6).
     TurnCredentialsRequest turn_credentials = 15;
+    // M8 (§ 6.15).
+    BotListRequest bot_list = 16;
   }
 }
 
@@ -924,6 +945,8 @@ message Response {
     BanPage ban_page = 9;
     // M7 (§ 6.6).
     TurnCredentials turn_credentials = 10;
+    // M8 (§ 6.15).
+    BotList bot_list = 11;
   }
 }
 
@@ -1120,6 +1143,9 @@ message VoiceState {
   bool server_mute = 6;
   bool server_deaf = 7;
   bool priority = 8;
+  // M8 (§ 6.15): the session takes in the channel's audio for more than
+  // listening. Set by the server for bots; declared by other sessions.
+  bool receiving_audio = 9;
 }
 
 // The account's whole state after a change, and the voice channel it was in
@@ -1148,6 +1174,8 @@ message SetVoiceState {
   optional bool self_mute = 1;
   optional bool self_deaf = 2;
   optional bool priority = 3;
+  // M8 (§ 6.15): ignored for bots, whose value the server sets.
+  optional bool receiving_audio = 4;
 }
 
 message SetMemberVoice {
@@ -1388,6 +1416,10 @@ enum AuditAction {
   // M7 (§ 6.14).
   AUDIT_ACTION_JOIN_POLICY_CHANGED = 15;
   AUDIT_ACTION_OPEN_JOIN_ROLES_CHANGED = 16;
+  // M8 (§ 6.15).
+  AUDIT_ACTION_BOT_CREATE = 17;
+  AUDIT_ACTION_BOT_ROTATE = 18;
+  AUDIT_ACTION_BOT_DELETE = 19;
 }
 
 message AuditEntry {
@@ -1553,3 +1585,44 @@ message MediaEnded {
   }
   MediaEndReason reason = 3;
 }
+
+// --- M8: bots (§ 6.15) ---
+
+// A bot of the space, as `bot_list` and `create_bot` show it: never its seed
+// or key.
+message Bot {
+  uint64 account_id = 1;
+  // The bot's current display name: user text.
+  string name = 2;
+  // Unix seconds.
+  uint64 created_at = 3;
+  // The member who created it.
+  uint64 created_by = 4;
+}
+
+// `create_bot` and `rotate_bot`: the bot and its seed, a secret returned once.
+message BotCreated {
+  Bot bot = 1;
+  // 52 lowercase base32 characters (32 bytes, no padding).
+  string seed = 2;
+}
+
+message BotList {
+  // Newest first (`created_at`, then `account_id`, descending).
+  repeated Bot bots = 1;
+}
+
+message CreateBot {
+  // The display-name rules (§ 6.8).
+  string name = 1;
+}
+
+message RotateBot {
+  uint64 account_id = 1;
+}
+
+message DeleteBot {
+  uint64 account_id = 1;
+}
+
+message BotListRequest {}

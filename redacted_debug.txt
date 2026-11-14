@@ -1,7 +1,11 @@
 yapsta.v1.AnswerMedia
 yapsta.v1.BlobData
+yapsta.v1.Bot
+yapsta.v1.BotCreated
+yapsta.v1.BotCredential
 yapsta.v1.Channel
 yapsta.v1.ClientInfo
+yapsta.v1.CreateBot
 yapsta.v1.CreateChannel
 yapsta.v1.CreateEmoji
 yapsta.v1.CreateRole
