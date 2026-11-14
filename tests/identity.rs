@@ -589,6 +589,17 @@ fn the_bot_known_answer_vectors() {
         hex(&vector_bot_seed().bot_key(&sid).public().to_bytes()),
         "b0efb9627014cc8717bb62cb7f22fb06deb90dcf26b52860ab643b8d6ee71326"
     );
+    // § 6.15's secret key, derived by hand from the spec's recipe.
+    assert_eq!(
+        hex(&hand_derived(b"yapsta/bot/v1", &std::array::from_fn(|i| i as u8)).to_bytes()),
+        "5ec4a3369d1b8aca6df6ca4a1680171f21730509450c8d03646ad560146430f1"
+    );
+    assert_eq!(
+        hand_derived(b"yapsta/bot/v1", &std::array::from_fn(|i| i as u8))
+            .verifying_key()
+            .to_bytes(),
+        vector_bot_seed().bot_key(&sid).public().to_bytes()
+    );
     assert_eq!(vector_bot_seed().text().as_str(), VECTOR_BOT_SEED_TEXT);
     // The salt keeps a bot key apart from the account and device keys of the
     // same 32 bytes.

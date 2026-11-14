@@ -297,31 +297,21 @@ impl BotSeed {
         let mut upper = Zeroizing::new([0u8; BOT_SEED_TEXT_LEN]);
         upper.copy_from_slice(text.as_bytes());
         upper.make_ascii_uppercase();
-        if BASE32_NOPAD.decode_len(BOT_SEED_TEXT_LEN) != Ok(32) {
-            return Err(IdentityError::BadBotSeed);
-        }
         let mut seed = Zeroizing::new([0u8; 32]);
         BASE32_NOPAD
             .decode_mut(&upper[..], &mut seed[..])
             .map_err(|_| IdentityError::BadBotSeed)?;
         // Base32 of 32 bytes leaves 4 spare bits in the last character: only
-        // the canonical encoding (spare bits zero) is a seed.
-        let mut check = Zeroizing::new([0u8; BOT_SEED_TEXT_LEN]);
-        BASE32_NOPAD.encode_mut(&seed[..], &mut check[..]);
-        if check[..] != upper[..] {
-            return Err(IdentityError::BadBotSeed);
-        }
+        // the canonical encoding (spare bits zero) is a seed. `BASE32_NOPAD`
+        // checks trailing bits, so `decode_mut` refuses any other.
         Ok(Self(seed))
     }
 
     /// The text form, lowercase: what `create_bot` returns once.
     pub fn text(&self) -> Zeroizing<String> {
-        let mut buf = Zeroizing::new([0u8; BOT_SEED_TEXT_LEN]);
-        BASE32_NOPAD.encode_mut(&self.0[..], &mut buf[..]);
-        buf.make_ascii_lowercase();
-        let mut text = Zeroizing::new(String::with_capacity(BOT_SEED_TEXT_LEN));
-        // ASCII from the base32 alphabet.
-        text.push_str(std::str::from_utf8(&buf[..]).expect("base32 is ASCII"));
+        // `encode` allocates exactly once, so no unzeroized copy is left.
+        let mut text = Zeroizing::new(BASE32_NOPAD.encode(&self.0[..]));
+        text.make_ascii_lowercase();
         text
     }
 
