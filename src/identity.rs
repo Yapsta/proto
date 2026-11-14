@@ -1,6 +1,7 @@
 //! Identity (docs/ARCHITECTURE.md § 6.2): the seed and its recovery phrase,
 //! the per-instance account and device keys, device lists and the `Auth`
-//! transcript. Clients derive and sign with it; the server verifies with it.
+//! transcript; from M8 a bot's seed, key and `Auth` transcript (§ 6.15).
+//! Clients and bots derive and sign with it; the server verifies with it.
 //!
 //! - Secrets (seed, device secret, derived keys) are zeroized on drop and never
 //!   shown by `Debug`.
@@ -25,6 +26,10 @@ const ACCOUNT_SALT: &[u8] = b"yapsta/account/v1";
 const DEVICE_SALT: &[u8] = b"yapsta/device/v1";
 const DEVICE_LIST_PREFIX: &[u8] = b"yapsta/device-list/v1\0";
 const AUTH_PREFIX: &[u8] = b"yapsta/auth/v1\0";
+const BOT_SALT: &[u8] = b"yapsta/bot/v1";
+const BOT_AUTH_PREFIX: &[u8] = b"yapsta/bot-auth/v1\0";
+/// A bot seed's text form: 32 bytes as unpadded base32 (§ 6.15).
+pub const BOT_SEED_TEXT_LEN: usize = 52;
 const SERVER_ID_LEN: usize = 26;
 
 /// The TLS exporter `Auth` is bound to (§ 6.2): this label, an **empty**
@@ -67,6 +72,8 @@ pub enum IdentityError {
     ListLimit,
     #[error("a device certificate expires too far ahead")]
     ExpiryTooFar,
+    #[error("not a bot seed")]
+    BadBotSeed,
 }
 
 /// An instance's id: the first 26 characters of the lowercase, unpadded
@@ -265,6 +272,86 @@ impl fmt::Debug for DeviceKey {
     }
 }
 
+/// A bot's seed (§ 6.15): 32 random bytes the server shows once, as
+/// [`BOT_SEED_TEXT_LEN`] lowercase base32 characters, and never keeps.
+pub struct BotSeed(Zeroizing<[u8; 32]>);
+
+impl BotSeed {
+    /// A fresh seed from the OS RNG.
+    pub fn generate() -> Result<Self, IdentityError> {
+        random().map(Self)
+    }
+
+    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
+        Self(Zeroizing::new(*bytes))
+    }
+
+    /// Reads the text form. Surrounding whitespace is ignored and either case
+    /// is accepted; anything else that is not 52 base32 characters for 32
+    /// bytes is refused. Works in zeroizing buffers only.
+    pub fn from_text(text: &str) -> Result<Self, IdentityError> {
+        let text = text.trim();
+        if text.len() != BOT_SEED_TEXT_LEN || !text.is_ascii() {
+            return Err(IdentityError::BadBotSeed);
+        }
+        let mut upper = Zeroizing::new([0u8; BOT_SEED_TEXT_LEN]);
+        upper.copy_from_slice(text.as_bytes());
+        upper.make_ascii_uppercase();
+        let mut seed = Zeroizing::new([0u8; 32]);
+        BASE32_NOPAD
+            .decode_mut(&upper[..], &mut seed[..])
+            .map_err(|_| IdentityError::BadBotSeed)?;
+        // Base32 of 32 bytes leaves 4 spare bits in the last character: only
+        // the canonical encoding (spare bits zero) is a seed. `BASE32_NOPAD`
+        // checks trailing bits, so `decode_mut` refuses any other.
+        Ok(Self(seed))
+    }
+
+    /// The text form, lowercase: what `create_bot` returns once.
+    pub fn text(&self) -> Zeroizing<String> {
+        // `encode` allocates exactly once, so no unzeroized copy is left.
+        let mut text = Zeroizing::new(BASE32_NOPAD.encode(&self.0[..]));
+        text.make_ascii_lowercase();
+        text
+    }
+
+    /// The bot's key on one instance: `Ed25519(HKDF-SHA256(seed,
+    /// salt="yapsta/bot/v1", info=server_id))`, derived as the account key.
+    pub fn bot_key(&self, server_id: &ServerId) -> BotKey {
+        BotKey(derive(&self.0, BOT_SALT, server_id))
+    }
+}
+
+impl fmt::Debug for BotSeed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("BotSeed(<redacted>)")
+    }
+}
+
+/// A bot's key on one instance; it signs the bot `Auth` transcript.
+pub struct BotKey(SigningKey);
+
+impl BotKey {
+    pub fn public(&self) -> PublicKey {
+        PublicKey(self.0.verifying_key())
+    }
+
+    /// Signs `transcript`. Refuses one that names another key as its
+    /// `bot_pub`, which no server would accept.
+    pub fn sign_auth(&self, transcript: &BotAuthTranscript<'_>) -> Result<[u8; 64], IdentityError> {
+        if transcript.bot_pub != &self.public() {
+            return Err(IdentityError::BadKey);
+        }
+        Ok(self.0.sign(&transcript.to_bytes()).to_bytes())
+    }
+}
+
+impl fmt::Debug for BotKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("BotKey").field(&self.public()).finish()
+    }
+}
+
 /// An Ed25519 public key that is safe to verify with: 32 canonical bytes of a
 /// point that is not of small order. Equal keys have equal bytes.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -409,6 +496,57 @@ impl fmt::Debug for AuthTranscript<'_> {
             .field("exporter", &"<redacted>")
             .field("account_pub", account_pub)
             .field("device_pub", device_pub)
+            .finish()
+    }
+}
+
+/// What a bot signs in `Auth` (§ 6.15): fixed-length fields after their own
+/// domain prefix, so it can never be taken for a device's transcript.
+#[derive(Clone, Copy)]
+pub struct BotAuthTranscript<'a> {
+    /// Recomputed from the pinned SPKI by the bot.
+    pub server_id: &'a ServerId,
+    /// `Hello.challenge`.
+    pub challenge: &'a [u8; 32],
+    /// The TLS exporter, exactly as for devices.
+    pub exporter: &'a [u8; EXPORTER_LEN],
+    pub bot_pub: &'a PublicKey,
+}
+
+impl BotAuthTranscript<'_> {
+    /// The signed bytes: `yapsta/bot-auth/v1 0x00 ‖ server_id ‖ challenge ‖
+    /// exporter ‖ bot_pub`.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        [
+            BOT_AUTH_PREFIX,
+            self.server_id.as_bytes(),
+            self.challenge,
+            self.exporter,
+            self.bot_pub.0.as_bytes(),
+        ]
+        .concat()
+    }
+
+    /// `verify_strict` of the bot key's `signature` over this transcript.
+    pub fn verify(&self, signature: &[u8]) -> Result<(), IdentityError> {
+        self.bot_pub.verify(&self.to_bytes(), signature)
+    }
+}
+
+/// The challenge and the exporter are this connection's binding.
+impl fmt::Debug for BotAuthTranscript<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            server_id,
+            challenge: _,
+            exporter: _,
+            bot_pub,
+        } = self;
+        f.debug_struct("BotAuthTranscript")
+            .field("server_id", server_id)
+            .field("challenge", &"<redacted>")
+            .field("exporter", &"<redacted>")
+            .field("bot_pub", bot_pub)
             .finish()
     }
 }

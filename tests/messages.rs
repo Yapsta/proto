@@ -32,6 +32,7 @@ fn full_member() -> Member {
         bio: "bio-text".to_owned(),
         pronouns: "pronoun-text".to_owned(),
         timeout_until: None,
+        bot: false,
     }
 }
 
@@ -750,6 +751,7 @@ fn voice_state() -> VoiceState {
         server_mute: true,
         server_deaf: true,
         priority: true,
+        receiving_audio: false,
     }
 }
 
@@ -785,6 +787,7 @@ fn m4_examples() -> Vec<(&'static str, Envelope)> {
                     self_mute: Some(true),
                     self_deaf: Some(false),
                     priority: Some(true),
+                    receiving_audio: None,
                 })),
             ),
         ),
@@ -1073,6 +1076,150 @@ const M7_SECRETS: &[&str] = &[
     "turn-user-text",
     "turn-password-text",
 ];
+
+/// The secret and user text in [`m8_examples`]: none may appear in `Debug`.
+const M8_SECRETS: &[&str] = &[
+    "aaaqeayeaudaocajbifqydiob4ibceqtcqkrmfyydenbwha5dypq",
+    "bot-name-text",
+];
+
+fn bot() -> Bot {
+    Bot {
+        account_id: 120,
+        name: "bot-name-text".to_owned(),
+        created_at: 1_800_000_000,
+        created_by: 42,
+    }
+}
+
+/// One example of every M8 wire-A kind and field (§ 6.15).
+fn m8_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let env = |request_id, last, body| Envelope {
+        request_id,
+        last,
+        body: Some(body),
+    };
+    let command = |request_id, kind| {
+        env(
+            request_id,
+            false,
+            Body::Command(Command { kind: Some(kind) }),
+        )
+    };
+    vec![
+        (
+            "m8_auth_bot",
+            env(
+                0,
+                false,
+                Body::Auth(Auth {
+                    version: 8,
+                    credential: Some(auth::Credential::Bot(BotCredential {
+                        bot_pub: vec![0xb0; 32],
+                        signature: vec![0x5a; 64],
+                    })),
+                    ..Auth::default()
+                }),
+            ),
+        ),
+        (
+            "m8_event_bot_joined",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 30,
+                    kind: Some(event::Kind::MemberJoined(MemberJoined {
+                        member: Some(Member {
+                            account_id: 120,
+                            joined_at: 1_800_000_000,
+                            bot: true,
+                            ..Member::default()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m8_event_voice_state_receiving",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 31,
+                    kind: Some(event::Kind::VoiceStateUpdated(VoiceStateUpdated {
+                        state: Some(VoiceState {
+                            receiving_audio: true,
+                            ..voice_state()
+                        }),
+                        previous_channel_id: 0,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m8_set_voice_state_receiving",
+            command(
+                130,
+                C::SetVoiceState(SetVoiceState {
+                    receiving_audio: Some(true),
+                    ..SetVoiceState::default()
+                }),
+            ),
+        ),
+        (
+            "m8_create_bot",
+            command(
+                131,
+                C::CreateBot(CreateBot {
+                    name: "bot-name-text".to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m8_rotate_bot",
+            command(132, C::RotateBot(RotateBot { account_id: 120 })),
+        ),
+        (
+            "m8_delete_bot",
+            command(133, C::DeleteBot(DeleteBot { account_id: 120 })),
+        ),
+        (
+            "m8_bot_created",
+            env(
+                131,
+                true,
+                Body::CommandResult(CommandResult {
+                    kind: Some(command_result::Kind::BotCreated(BotCreated {
+                        bot: Some(bot()),
+                        seed: M8_SECRETS[0].to_owned(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m8_bot_list_request",
+            env(
+                134,
+                false,
+                Body::Request(Request {
+                    kind: Some(request::Kind::BotList(BotListRequest {})),
+                }),
+            ),
+        ),
+        (
+            "m8_bot_list",
+            env(
+                134,
+                true,
+                Body::Response(Response {
+                    kind: Some(response::Kind::BotList(BotList { bots: vec![bot()] })),
+                }),
+            ),
+        ),
+    ]
+}
 
 fn media_track() -> MediaTrack {
     MediaTrack {
@@ -1869,6 +2016,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m6_examples())
     .chain(m7_examples())
     .chain(m7_media_examples())
+    .chain(m8_examples())
     .collect()
 }
 
@@ -1967,8 +2115,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 7);
-    assert_eq!(SUPPORTED_MINORS, [7, 6]);
+    assert_eq!(MINOR_VERSION, 8);
+    assert_eq!(SUPPORTED_MINORS, [8, 7]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -2500,6 +2648,26 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         6 + 1,
         "every M7 media command and request kind has an example"
     );
+    // Every M8 command and request kind is minor 8 (§ 6.15, § 6.7 "Minor
+    // 8"); `set_voice_state` only gained a field, which the session gates on
+    // its own; the rest is server-sent or the handshake.
+    let mut m8_kinds = 0;
+    for (name, env) in m8_examples() {
+        let body = env.body.unwrap();
+        let expected = match (&body, name) {
+            (_, "m8_set_voice_state_receiving") => 4,
+            (Body::Command(_) | Body::Request(_), _) => 8,
+            (Body::CommandResult(_) | Body::Response(_), _) => 2,
+            _ => 1,
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+        m8_kinds += usize::from(expected == 8);
+    }
+    assert_eq!(
+        m8_kinds,
+        3 + 1,
+        "every M8 command and request kind has an example"
+    );
     // The older redeem variants stay minor 2.
     for code in [
         redeem::Code::ClaimCode("c".to_owned()),
@@ -2511,4 +2679,42 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
     // An unset kind is refused as unknown, not for its version.
     assert_eq!(minor_of(&Body::Command(Command { kind: None })), 2);
     assert_eq!(minor_of(&Body::Request(Request { kind: None })), 2);
+}
+
+#[test]
+fn bot_seeds_signatures_and_names_are_only_redacted_in_debug() {
+    for (name, env) in m8_examples() {
+        let bytes = env.encode_to_vec();
+        let decoded = Envelope::decode(bytes.as_slice()).unwrap();
+        let shown = format!("{decoded:?}");
+        for secret in M8_SECRETS {
+            assert!(!shown.contains(secret), "{name}: {secret} in {shown}");
+        }
+        let carried: Vec<_> = M8_SECRETS
+            .iter()
+            .filter(|s| bytes.windows(s.len()).any(|w| w == s.as_bytes()))
+            .collect();
+        let expected: Vec<_> = match name {
+            "m8_bot_created" => M8_SECRETS.iter().collect(),
+            "m8_create_bot" | "m8_bot_list" => vec![&M8_SECRETS[1]],
+            _ => vec![],
+        };
+        assert_eq!(carried, expected, "{name}: on the wire");
+        for secret in carried {
+            assert!(
+                shown.contains(&format!("<{} bytes>", secret.len())),
+                "{name}: {shown}"
+            );
+        }
+    }
+    // The bot credential shows its public key and only the signature's
+    // length.
+    let (_, auth) = m8_examples()
+        .into_iter()
+        .find(|(n, _)| *n == "m8_auth_bot")
+        .unwrap();
+    let shown = format!("{auth:?}");
+    assert!(shown.contains("signature: <64 bytes>"), "{shown}");
+    assert!(!shown.contains("90, 90"), "{shown}"); // 0x5a
+    assert!(shown.contains("176, 176"), "{shown}"); // 0xb0: the key
 }

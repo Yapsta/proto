@@ -22,6 +22,7 @@ use crate::v1::{
     UpdateThread, UploadAttachmentRequest, UploadImageRequest, UploadSlot, VoiceChatAccess,
     Welcome, emoji_ref, redeem, welcome,
 };
+use crate::v1::{Bot, BotCreated, BotCredential, CreateBot};
 use crate::v1::{MediaKind, MediaOffer, MediaPublished, PublishMedia, TurnCredentials};
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -259,6 +260,7 @@ redacting_debug!(Member {
     bio: text,
     pronouns: text,
     timeout_until,
+    bot,
 });
 redacting_debug!(BlobData {
     blob_id,
@@ -482,4 +484,19 @@ redacting_debug!(TurnCredentials {
     username: text,
     password: text,
     expires_at,
+});
+
+// M8 (§ 6.15): the seed is a secret shown once; a bot's name is user text;
+// the key is public, the signature is shown by length only.
+redacting_debug!(Bot {
+    account_id,
+    name: text,
+    created_at,
+    created_by,
+});
+redacting_debug!(BotCreated { bot, seed: text });
+redacting_debug!(CreateBot { name: text });
+redacting_debug!(BotCredential {
+    bot_pub,
+    signature: text
 });
