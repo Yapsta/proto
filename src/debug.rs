@@ -62,8 +62,11 @@ impl<E: TryFrom<i32> + fmt::Debug> fmt::Debug for Enum<E> {
 /// compile error here): `text` shows a string or bytes field's length only,
 /// `opt_text` the same for an optional one, `kind` a `ChannelKind`, `purpose`
 /// an `ImagePurpose`, `style` / `access` a `SpaceStyle` / `VoiceChatAccess`
-/// (`opt_style` / `opt_access` the optional ones), and a bare field prints as
-/// it is.
+/// (`opt_style` / `opt_access` the optional ones), `option_kind` a
+/// `CommandOptionKind`, `command_name` a command or option name only when it
+/// has § 6.15's form (1–32 bytes of `a`–`z`, `0`–`9`, `_`, `-`; otherwise its
+/// length), `count` a list by its length (option values), and a bare field
+/// prints as it is.
 macro_rules! redacting_debug {
     ($message:ident { $($field:ident $(: $how:ident)?),* $(,)? }) => {
         impl fmt::Debug for $message {

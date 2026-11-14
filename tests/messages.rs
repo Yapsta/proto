@@ -3048,6 +3048,30 @@ fn webhook_tokens_names_and_option_values_are_only_redacted_in_debug() {
         value: None,
     };
     assert!(format!("{long:?}").contains("name: <33 bytes>"));
+    // The bounds of the § 6.15 name form: 32 bytes show, an empty name and
+    // capitals alone do not.
+    let longest = CommandOptionValue {
+        name: "a".repeat(32),
+        value: None,
+    };
+    assert!(
+        format!("{longest:?}").contains(&format!("name: \"{}\"", "a".repeat(32))),
+        "{longest:?}"
+    );
+    let empty = CommandOptionValue::default();
+    assert!(
+        format!("{empty:?}").contains("name: <0 bytes>"),
+        "{empty:?}"
+    );
+    let capitals = InvokeCommand {
+        name: "Roll".to_owned(),
+        ..InvokeCommand::default()
+    };
+    let shown = format!("{capitals:?}");
+    assert!(
+        !shown.contains("Roll") && shown.contains("name: <4 bytes>"),
+        "{shown}"
+    );
     // A kind from a newer peer shows its number.
     let newer = CommandOption {
         kind: 99,
