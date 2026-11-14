@@ -5,16 +5,21 @@ yapsta.v1.BotCreated
 yapsta.v1.BotCredential
 yapsta.v1.Channel
 yapsta.v1.ClientInfo
+yapsta.v1.CommandOption
+yapsta.v1.CommandOptionValue
 yapsta.v1.CreateBot
 yapsta.v1.CreateChannel
 yapsta.v1.CreateEmoji
 yapsta.v1.CreateRole
 yapsta.v1.CreateThread
+yapsta.v1.CreateWebhook
 yapsta.v1.CustomEmoji
 yapsta.v1.EditMessage
 yapsta.v1.EmojiRef
 yapsta.v1.Error
+yapsta.v1.Interaction
 yapsta.v1.InviteCreated
+yapsta.v1.InvokeCommand
 yapsta.v1.JoinVoice
 yapsta.v1.MediaOffer
 yapsta.v1.MediaPublished
@@ -35,6 +40,7 @@ yapsta.v1.SetNickname
 yapsta.v1.SetPresence
 yapsta.v1.SignedDeviceList
 yapsta.v1.SignedUrl
+yapsta.v1.SlashCommand
 yapsta.v1.Space
 yapsta.v1.SpacePublicInfo
 yapsta.v1.Thread
@@ -47,4 +53,6 @@ yapsta.v1.UpdateThread
 yapsta.v1.UploadAttachmentRequest
 yapsta.v1.UploadImageRequest
 yapsta.v1.UploadSlot
+yapsta.v1.Webhook
+yapsta.v1.WebhookCreated
 yapsta.v1.Welcome

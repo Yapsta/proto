@@ -135,6 +135,8 @@ fn message() -> yapsta_proto::v1::Message {
         edited_at: Some(1_800_000_200),
         deleted: false,
         pinned: true,
+        webhook_id: None,
+        webhook_name: None,
     }
 }
 
@@ -1221,6 +1223,224 @@ fn m8_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// The secret and user text in [`m8_wire_b_examples`]: none may appear in
+/// `Debug`. The last two are option values that are not text (an integer and a
+/// member's id), which `Debug` leaves out as well.
+const M8B_SECRETS: &[&str] = &[
+    "webhook-token-text",
+    "webhook-name-text",
+    "command-description-text",
+    "option-description-text",
+    "option-value-text",
+    "987654321",
+    "31337",
+];
+
+fn slash_command() -> SlashCommand {
+    SlashCommand {
+        name: "roll".to_owned(),
+        description: M8B_SECRETS[2].to_owned(),
+        options: vec![CommandOption {
+            name: "sides".to_owned(),
+            description: M8B_SECRETS[3].to_owned(),
+            kind: CommandOptionKind::Integer as i32,
+            required: true,
+        }],
+    }
+}
+
+/// One value of each kind: the values are never shown.
+fn option_values() -> Vec<CommandOptionValue> {
+    use command_option_value::Value;
+    [
+        ("say", Value::Text(M8B_SECRETS[4].to_owned())),
+        ("sides", Value::Integer(-987_654_321)),
+        ("loud", Value::Boolean(true)),
+        ("who", Value::AccountId(31_337)),
+        ("where", Value::ChannelId(5)),
+    ]
+    .into_iter()
+    .map(|(name, value)| CommandOptionValue {
+        name: name.to_owned(),
+        value: Some(value),
+    })
+    .collect()
+}
+
+fn webhook() -> Webhook {
+    Webhook {
+        id: 150,
+        channel_id: 5,
+        name: M8B_SECRETS[1].to_owned(),
+        created_by: 42,
+        created_at: 1_800_000_000,
+    }
+}
+
+/// One example of every M8 wire-B kind and field (§ 6.15): slash commands
+/// and webhooks.
+fn m8_wire_b_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let env = |request_id, last, body| Envelope {
+        request_id,
+        last,
+        body: Some(body),
+    };
+    let command = |request_id, kind| {
+        env(
+            request_id,
+            false,
+            Body::Command(Command { kind: Some(kind) }),
+        )
+    };
+    let request = |request_id, kind| {
+        env(
+            request_id,
+            false,
+            Body::Request(Request { kind: Some(kind) }),
+        )
+    };
+    let response = |request_id, kind| {
+        env(
+            request_id,
+            true,
+            Body::Response(Response { kind: Some(kind) }),
+        )
+    };
+    vec![
+        (
+            "m8_register_commands",
+            command(
+                140,
+                C::RegisterCommands(RegisterCommands {
+                    commands: vec![slash_command()],
+                }),
+            ),
+        ),
+        (
+            "m8_invoke_command",
+            command(
+                141,
+                C::InvokeCommand(InvokeCommand {
+                    bot_account_id: 120,
+                    channel_id: 5,
+                    name: "roll".to_owned(),
+                    options: option_values(),
+                }),
+            ),
+        ),
+        (
+            "m8_create_webhook",
+            command(
+                142,
+                C::CreateWebhook(CreateWebhook {
+                    channel_id: 5,
+                    name: M8B_SECRETS[1].to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m8_delete_webhook",
+            command(143, C::DeleteWebhook(DeleteWebhook { webhook_id: 150 })),
+        ),
+        (
+            "m8_command_list_request",
+            request(
+                144,
+                request::Kind::CommandList(CommandListRequest {
+                    bot_account_id: 120,
+                }),
+            ),
+        ),
+        (
+            "m8_webhook_list_request",
+            request(145, request::Kind::WebhookList(WebhookListRequest {})),
+        ),
+        (
+            "m8_webhook_created",
+            env(
+                142,
+                true,
+                Body::CommandResult(CommandResult {
+                    kind: Some(command_result::Kind::WebhookCreated(WebhookCreated {
+                        webhook: Some(webhook()),
+                        token: M8B_SECRETS[0].to_owned(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m8_command_list",
+            response(
+                144,
+                response::Kind::CommandList(CommandList {
+                    bot_account_id: 120,
+                    commands: vec![slash_command()],
+                }),
+            ),
+        ),
+        (
+            "m8_webhook_list",
+            response(
+                145,
+                response::Kind::WebhookList(WebhookList {
+                    webhooks: vec![webhook()],
+                }),
+            ),
+        ),
+        (
+            "m8_event_commands_updated",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 32,
+                    kind: Some(event::Kind::CommandsUpdated(CommandsUpdated {
+                        bot_account_id: 120,
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m8_interaction",
+            env(
+                0,
+                false,
+                Body::Ephemeral(Ephemeral {
+                    kind: Some(ephemeral::Kind::Interaction(Interaction {
+                        invoker_id: 42,
+                        channel_id: 5,
+                        name: "roll".to_owned(),
+                        options: option_values(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m8_event_webhook_message",
+            env(
+                0,
+                false,
+                Body::Event(Event {
+                    seq: 33,
+                    kind: Some(event::Kind::MessageCreated(MessageCreated {
+                        message: Some(yapsta_proto::v1::Message {
+                            id: 71,
+                            channel_id: 5,
+                            author_id: 0,
+                            created_at: 1_800_000_300,
+                            content: "webhook-post-text".to_owned(),
+                            webhook_id: Some(150),
+                            webhook_name: Some(M8B_SECRETS[1].to_owned()),
+                            ..yapsta_proto::v1::Message::default()
+                        }),
+                    })),
+                }),
+            ),
+        ),
+    ]
+}
+
 fn media_track() -> MediaTrack {
     MediaTrack {
         media_id: 7,
@@ -2017,6 +2237,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m7_examples())
     .chain(m7_media_examples())
     .chain(m8_examples())
+    .chain(m8_wire_b_examples())
     .collect()
 }
 
@@ -2668,6 +2889,25 @@ fn each_body_and_kind_names_the_minor_that_added_it() {
         3 + 1,
         "every M8 command and request kind has an example"
     );
+    // So is every wire-B kind; the event, the ephemeral and the webhook
+    // fields of `Message` are server-sent, kept from minor 7 by the session
+    // (§ 6.7 "Minor 8").
+    let mut m8b_kinds = 0;
+    for (name, env) in m8_wire_b_examples() {
+        let body = env.body.unwrap();
+        let expected = match &body {
+            Body::Command(_) | Body::Request(_) => 8,
+            Body::CommandResult(_) | Body::Response(_) => 2,
+            _ => 1,
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+        m8b_kinds += usize::from(expected == 8);
+    }
+    assert_eq!(
+        m8b_kinds,
+        4 + 2,
+        "every M8 wire-B command and request kind has an example"
+    );
     // The older redeem variants stay minor 2.
     for code in [
         redeem::Code::ClaimCode("c".to_owned()),
@@ -2717,4 +2957,101 @@ fn bot_seeds_signatures_and_names_are_only_redacted_in_debug() {
     assert!(shown.contains("signature: <64 bytes>"), "{shown}");
     assert!(!shown.contains("90, 90"), "{shown}"); // 0x5a
     assert!(shown.contains("176, 176"), "{shown}"); // 0xb0: the key
+}
+
+#[test]
+fn webhook_tokens_names_and_option_values_are_only_redacted_in_debug() {
+    for (name, env) in m8_wire_b_examples() {
+        let bytes = env.encode_to_vec();
+        let decoded = Envelope::decode(bytes.as_slice()).unwrap();
+        let shown = format!("{decoded:?}");
+        for secret in M8B_SECRETS {
+            assert!(!shown.contains(secret), "{name}: {secret} in {shown}");
+        }
+        // The text ones only: the two numbers are not on the wire as text.
+        let carried: Vec<_> = M8B_SECRETS[..5]
+            .iter()
+            .filter(|s| bytes.windows(s.len()).any(|w| w == s.as_bytes()))
+            .collect();
+        let expected: Vec<_> = match name {
+            "m8_webhook_created" => vec![&M8B_SECRETS[0], &M8B_SECRETS[1]],
+            "m8_create_webhook" | "m8_webhook_list" | "m8_event_webhook_message" => {
+                vec![&M8B_SECRETS[1]]
+            }
+            "m8_register_commands" | "m8_command_list" => {
+                vec![&M8B_SECRETS[2], &M8B_SECRETS[3]]
+            }
+            "m8_invoke_command" | "m8_interaction" => vec![&M8B_SECRETS[4]],
+            _ => vec![],
+        };
+        assert_eq!(carried, expected, "{name}: on the wire");
+        // Option values are left out altogether (counted, below); the rest
+        // shows by length.
+        for secret in carried.into_iter().filter(|s| **s != M8B_SECRETS[4]) {
+            assert!(
+                shown.contains(&format!("<{} bytes>", secret.len())),
+                "{name}: {shown}"
+            );
+        }
+    }
+    let shown = |name: &str| {
+        let (_, env) = m8_wire_b_examples()
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .unwrap();
+        format!("{env:?}")
+    };
+    // An invocation shows its ids, the command's name and the number of
+    // options, never their values.
+    for name in ["m8_invoke_command", "m8_interaction"] {
+        let shown = shown(name);
+        assert!(shown.contains("name: \"roll\""), "{shown}");
+        assert!(shown.contains("channel_id: 5"), "{shown}");
+        assert!(shown.contains("options: <5 options>"), "{shown}");
+        assert!(!shown.contains("-987654321"), "{shown}");
+    }
+    assert!(shown("m8_invoke_command").contains("bot_account_id: 120"));
+    assert!(shown("m8_interaction").contains("invoker_id: 42"));
+    // A registered set shows names and kinds, descriptions by length.
+    let set = shown("m8_register_commands");
+    assert!(
+        set.contains("name: \"sides\"") && set.contains("kind: Integer"),
+        "{set}"
+    );
+    // The webhook keeps its ids; a message's webhook id shows too.
+    assert!(shown("m8_webhook_created").contains("id: 150"));
+    assert!(shown("m8_event_webhook_message").contains("webhook_id: Some(150)"));
+    // An option value shows its name and kind only.
+    for value in option_values() {
+        let shown = format!("{value:?}");
+        assert!(
+            shown.contains(&format!("name: \"{}\"", value.name)),
+            "{shown}"
+        );
+        for secret in M8B_SECRETS {
+            assert!(!shown.contains(secret), "{shown}");
+        }
+    }
+    let text = format!("{:?}", option_values()[0]);
+    assert!(text.contains("value: Some(\"Text\")"), "{text}");
+    // A name that is not a command name (a peer's free text in its place)
+    // shows by length only.
+    let free = InvokeCommand {
+        name: "Free Text Name".to_owned(),
+        ..InvokeCommand::default()
+    };
+    let shown = format!("{free:?}");
+    assert!(!shown.contains("Free Text"), "{shown}");
+    assert!(shown.contains("name: <14 bytes>"), "{shown}");
+    let long = CommandOptionValue {
+        name: "a".repeat(33),
+        value: None,
+    };
+    assert!(format!("{long:?}").contains("name: <33 bytes>"));
+    // A kind from a newer peer shows its number.
+    let newer = CommandOption {
+        kind: 99,
+        ..CommandOption::default()
+    };
+    assert!(format!("{newer:?}").contains("Unknown(99)"), "{newer:?}");
 }
