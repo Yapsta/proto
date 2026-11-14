@@ -118,17 +118,28 @@ message SpacePublicInfo {
 message Auth {
   // The highest entry of Hello.versions the client speaks.
   uint32 version = 1;
-  // How the client proves who it is. M8 adds a bot token beside `device`
-  // (§ 6.2); a field never moves into a oneof later (§ 6.7), so the oneof is
-  // here from the start.
+  // How the client proves who it is: a person's device, or from M8 a bot
+  // (§ 6.15); a field never moves into a oneof later (§ 6.7), so the oneof
+  // was here from the start.
   oneof credential {
     DeviceCredential device = 2;
+    // M8 (§ 6.15): needs `version` 8 or later.
+    BotCredential bot = 7;
   }
   repeated Capability capabilities = 3;
   ClientInfo client_info = 4;
   // The initial account status (§ 6.3).
   optional PresenceStatus presence = 5;
   optional Resume resume = 6;
+}
+
+// A bot (§ 6.15, M8): its key, derived from the seed shown at creation, and
+// its Ed25519 signature over the bot Auth transcript (§ 6.2).
+message BotCredential {
+  // 32 bytes.
+  bytes bot_pub = 1;
+  // 64 bytes.
+  bytes signature = 2;
 }
 
 // A person's device (§ 6.2).
@@ -225,6 +236,9 @@ message Event {
     // only.
     MediaTrackAdded media_track_added = 27;
     MediaTrackRemoved media_track_removed = 28;
+    // M8 (§ 6.15): to every member, after a bot's register_commands. Minor 8
+    // only.
+    CommandsUpdated commands_updated = 29;
   }
 }
 
@@ -248,6 +262,8 @@ message Member {
   // M6 (§ 6.12), in both forms: present while the timeout is in the future
   // when the message is built. Clients compare it with their clock.
   optional uint64 timeout_until = 9;
+  // M8 (§ 6.15), in both forms: the account is a bot.
+  bool bot = 10;
 }
 
 message Ephemeral {
@@ -268,6 +284,9 @@ message Ephemeral {
     // M7 (§ 6.6): to the owning session when the server ends its track or
     // subscription. Minor 7 only.
     MediaEnded media_ended = 7;
+    // M8 (§ 6.15): to the bot's session when a member invokes one of its
+    // commands. Minor 8 only.
+    Interaction interaction = 8;
   }
 }
 
@@ -656,6 +675,14 @@ message Command {
     SubscribeMedia subscribe_media = 57;
     AnswerMedia answer_media = 58;
     UnsubscribeMedia unsubscribe_media = 59;
+    // M8 (§ 6.15).
+    CreateBot create_bot = 60;
+    RotateBot rotate_bot = 61;
+    DeleteBot delete_bot = 62;
+    RegisterCommands register_commands = 63;
+    InvokeCommand invoke_command = 64;
+    CreateWebhook create_webhook = 65;
+    DeleteWebhook delete_webhook = 66;
   }
 }
 
@@ -848,6 +875,9 @@ message CommandResult {
     // M7 (§ 6.6).
     MediaPublished media_published = 8;
     MediaOffer media_offer = 9;
+    // M8 (§ 6.15).
+    BotCreated bot_created = 10;
+    WebhookCreated webhook_created = 11;
   }
 }
 
@@ -882,6 +912,10 @@ message Request {
     BanListRequest ban_list = 14;
     // M7 (§ 6.6).
     TurnCredentialsRequest turn_credentials = 15;
+    // M8 (§ 6.15).
+    BotListRequest bot_list = 16;
+    CommandListRequest command_list = 17;
+    WebhookListRequest webhook_list = 18;
   }
 }
 
@@ -924,6 +958,10 @@ message Response {
     BanPage ban_page = 9;
     // M7 (§ 6.6).
     TurnCredentials turn_credentials = 10;
+    // M8 (§ 6.15).
+    BotList bot_list = 11;
+    CommandList command_list = 12;
+    WebhookList webhook_list = 13;
   }
 }
 
@@ -964,6 +1002,10 @@ message Message {
   // A tombstone: no content, mentions, attachments or reactions.
   bool deleted = 12;
   bool pinned = 13;
+  // M8 (§ 6.15): set on a webhook's message, whose author_id is 0.
+  optional uint64 webhook_id = 14;
+  // The webhook's name when it posted: user text.
+  optional string webhook_name = 15;
 }
 
 message Mentions {
@@ -1120,6 +1162,9 @@ message VoiceState {
   bool server_mute = 6;
   bool server_deaf = 7;
   bool priority = 8;
+  // M8 (§ 6.15): the session takes in the channel's audio for more than
+  // listening. Set by the server for bots; declared by other sessions.
+  bool receiving_audio = 9;
 }
 
 // The account's whole state after a change, and the voice channel it was in
@@ -1148,6 +1193,8 @@ message SetVoiceState {
   optional bool self_mute = 1;
   optional bool self_deaf = 2;
   optional bool priority = 3;
+  // M8 (§ 6.15): ignored for bots, whose value the server sets.
+  optional bool receiving_audio = 4;
 }
 
 message SetMemberVoice {
@@ -1388,6 +1435,12 @@ enum AuditAction {
   // M7 (§ 6.14).
   AUDIT_ACTION_JOIN_POLICY_CHANGED = 15;
   AUDIT_ACTION_OPEN_JOIN_ROLES_CHANGED = 16;
+  // M8 (§ 6.15).
+  AUDIT_ACTION_BOT_CREATE = 17;
+  AUDIT_ACTION_BOT_ROTATE = 18;
+  AUDIT_ACTION_BOT_DELETE = 19;
+  AUDIT_ACTION_WEBHOOK_CREATE = 20;
+  AUDIT_ACTION_WEBHOOK_DELETE = 21;
 }
 
 message AuditEntry {
@@ -1553,3 +1606,162 @@ message MediaEnded {
   }
   MediaEndReason reason = 3;
 }
+
+// --- M8: bots (§ 6.15) ---
+
+// A bot of the space, as `bot_list` and `create_bot` show it: never its seed
+// or key.
+message Bot {
+  uint64 account_id = 1;
+  // The bot's current display name: user text.
+  string name = 2;
+  // Unix seconds.
+  uint64 created_at = 3;
+  // The member who created it.
+  uint64 created_by = 4;
+}
+
+// `create_bot` and `rotate_bot`: the bot and its seed, a secret returned once.
+message BotCreated {
+  Bot bot = 1;
+  // 52 lowercase base32 characters (32 bytes, no padding).
+  string seed = 2;
+}
+
+message BotList {
+  // Newest first (`created_at`, then `account_id`, descending).
+  repeated Bot bots = 1;
+}
+
+message CreateBot {
+  // The display-name rules (§ 6.8).
+  string name = 1;
+}
+
+message RotateBot {
+  uint64 account_id = 1;
+}
+
+message DeleteBot {
+  uint64 account_id = 1;
+}
+
+message BotListRequest {}
+
+// --- M8: slash commands and webhooks (§ 6.15) ---
+
+enum CommandOptionKind {
+  COMMAND_OPTION_KIND_UNSPECIFIED = 0;
+  COMMAND_OPTION_KIND_STRING = 1;
+  COMMAND_OPTION_KIND_INTEGER = 2;
+  COMMAND_OPTION_KIND_BOOLEAN = 3;
+  COMMAND_OPTION_KIND_MEMBER = 4;
+  COMMAND_OPTION_KIND_CHANNEL = 5;
+}
+
+message CommandOption {
+  // 1-32 bytes of a-z, 0-9, _ and -; unique within the command.
+  string name = 1;
+  // 1-100 bytes, the display-name rules: user text.
+  string description = 2;
+  CommandOptionKind kind = 3;
+  // Required options come before optional ones.
+  bool required = 4;
+}
+
+message SlashCommand {
+  // 1-32 bytes of a-z, 0-9, _ and -; unique within the set.
+  string name = 1;
+  // 1-100 bytes, the display-name rules: user text.
+  string description = 2;
+  // At most 10.
+  repeated CommandOption options = 3;
+}
+
+// `command_list`: one bot's set, in registration order.
+message CommandList {
+  uint64 bot_account_id = 1;
+  repeated SlashCommand commands = 2;
+}
+
+// One option of an invocation: user text, never stored or logged.
+message CommandOptionValue {
+  string name = 1;
+  oneof value {
+    // STRING: 1-1,000 bytes.
+    string text = 2;
+    sint64 integer = 3;
+    bool boolean = 4;
+    // MEMBER.
+    uint64 account_id = 5;
+    // CHANNEL.
+    uint64 channel_id = 6;
+  }
+}
+
+// To the bot's session: a member invoked one of its commands.
+message Interaction {
+  uint64 invoker_id = 1;
+  uint64 channel_id = 2;
+  string name = 3;
+  repeated CommandOptionValue options = 4;
+}
+
+// Payload-free apart from the bot: clients fetch its set with command_list.
+message CommandsUpdated {
+  uint64 bot_account_id = 1;
+}
+
+// An incoming webhook, as listed: never its token.
+message Webhook {
+  uint64 id = 1;
+  // A text channel.
+  uint64 channel_id = 2;
+  // The display-name rules: user text.
+  string name = 3;
+  uint64 created_by = 4;
+  // Unix seconds.
+  uint64 created_at = 5;
+}
+
+// `create_webhook`: the webhook and its token, a secret returned once.
+message WebhookCreated {
+  Webhook webhook = 1;
+  // `<id>.<secret>`: 16 hex characters, a dot, 26 base32 characters.
+  string token = 2;
+}
+
+message WebhookList {
+  // By id ascending.
+  repeated Webhook webhooks = 1;
+}
+
+// A bot session's whole set of commands; an empty list removes them all.
+message RegisterCommands {
+  // At most 50.
+  repeated SlashCommand commands = 1;
+}
+
+message InvokeCommand {
+  uint64 bot_account_id = 1;
+  uint64 channel_id = 2;
+  string name = 3;
+  repeated CommandOptionValue options = 4;
+}
+
+message CreateWebhook {
+  // A text channel.
+  uint64 channel_id = 1;
+  // The display-name rules (§ 6.8).
+  string name = 2;
+}
+
+message DeleteWebhook {
+  uint64 webhook_id = 1;
+}
+
+message CommandListRequest {
+  uint64 bot_account_id = 1;
+}
+
+message WebhookListRequest {}

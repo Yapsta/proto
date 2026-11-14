@@ -573,3 +573,195 @@ fn debug_never_shows_secrets() {
     // Public keys do show, as hex.
     assert!(shown.contains("120224b63eda1adf"), "{shown}");
 }
+
+const VECTOR_BOT_SEED_TEXT: &str = "aaaqeayeaudaocajbifqydiob4ibceqtcqkrmfyydenbwha5dypq";
+
+fn vector_bot_seed() -> BotSeed {
+    BotSeed::from_bytes(&std::array::from_fn(|i| i as u8))
+}
+
+/// § 6.15's vectors, computed independently (Python HKDF + RFC 8032 key
+/// generation, and base32 of 00..1f).
+#[test]
+fn the_bot_known_answer_vectors() {
+    let sid = server_id();
+    assert_eq!(
+        hex(&vector_bot_seed().bot_key(&sid).public().to_bytes()),
+        "b0efb9627014cc8717bb62cb7f22fb06deb90dcf26b52860ab643b8d6ee71326"
+    );
+    // § 6.15's secret key, derived by hand from the spec's recipe.
+    assert_eq!(
+        hex(&hand_derived(b"yapsta/bot/v1", &std::array::from_fn(|i| i as u8)).to_bytes()),
+        "5ec4a3369d1b8aca6df6ca4a1680171f21730509450c8d03646ad560146430f1"
+    );
+    assert_eq!(
+        hand_derived(b"yapsta/bot/v1", &std::array::from_fn(|i| i as u8))
+            .verifying_key()
+            .to_bytes(),
+        vector_bot_seed().bot_key(&sid).public().to_bytes()
+    );
+    assert_eq!(vector_bot_seed().text().as_str(), VECTOR_BOT_SEED_TEXT);
+    // The salt keeps a bot key apart from the account and device keys of the
+    // same 32 bytes.
+    assert_ne!(
+        vector_bot_seed().bot_key(&sid).public(),
+        vector_seed().account_key(&sid).public()
+    );
+    // Another instance, another key.
+    assert_ne!(
+        vector_bot_seed().bot_key(&sid).public(),
+        vector_bot_seed()
+            .bot_key(&ServerId::from_spki(b"elsewhere"))
+            .public()
+    );
+}
+
+#[test]
+fn bot_seed_text_round_trips_and_parses_strictly() {
+    let seed = BotSeed::from_text(VECTOR_BOT_SEED_TEXT).unwrap();
+    assert_eq!(seed.text().as_str(), VECTOR_BOT_SEED_TEXT);
+    // Surrounding whitespace and either case are accepted (§ 6.15).
+    for text in [
+        format!("  {VECTOR_BOT_SEED_TEXT}\n"),
+        VECTOR_BOT_SEED_TEXT.to_uppercase(),
+    ] {
+        assert_eq!(
+            BotSeed::from_text(&text).unwrap().text().as_str(),
+            VECTOR_BOT_SEED_TEXT
+        );
+    }
+    let fresh = BotSeed::generate().unwrap();
+    assert_eq!(
+        BotSeed::from_text(&fresh.text()).unwrap().text(),
+        fresh.text()
+    );
+    // Wrong length, a character outside the alphabet, inner whitespace, a
+    // non-canonical last character (spare bits set), non-ASCII.
+    let mut noncanonical = VECTOR_BOT_SEED_TEXT.to_owned();
+    noncanonical.replace_range(51.., "r");
+    for bad in [
+        &VECTOR_BOT_SEED_TEXT[..51],
+        &format!("{VECTOR_BOT_SEED_TEXT}a"),
+        &VECTOR_BOT_SEED_TEXT.replace('a', "1"),
+        &format!(
+            "{} {}",
+            &VECTOR_BOT_SEED_TEXT[..26],
+            &VECTOR_BOT_SEED_TEXT[26..51]
+        ),
+        &noncanonical,
+        &VECTOR_BOT_SEED_TEXT.replacen('a', "ä", 1),
+        "",
+    ] {
+        assert!(BotSeed::from_text(bad).is_err(), "{bad:?}");
+    }
+    assert_eq!(format!("{seed:?}"), "BotSeed(<redacted>)");
+}
+
+#[test]
+fn the_bot_auth_transcript() {
+    let sid = server_id();
+    let key = vector_bot_seed().bot_key(&sid);
+    let bot_pub = key.public();
+    let transcript = BotAuthTranscript {
+        server_id: &sid,
+        challenge: &[0xc1; 32],
+        exporter: &[0xe2; 32],
+        bot_pub: &bot_pub,
+    };
+    // § 6.2's table: the bot prefix, then fixed-length fields.
+    let bytes = transcript.to_bytes();
+    assert_eq!(bytes.len(), 19 + 26 + 3 * 32);
+    assert_eq!(&bytes[..19], b"yapsta/bot-auth/v1\0");
+    assert_eq!(&bytes[19..45], VECTOR_SERVER_ID.as_bytes());
+    assert_eq!(&bytes[45..77], &[0xc1; 32]);
+    assert_eq!(&bytes[77..109], &[0xe2; 32]);
+    assert_eq!(&bytes[109..], &bot_pub.to_bytes());
+
+    let signature = key.sign_auth(&transcript).unwrap();
+    assert_eq!(transcript.verify(&signature), Ok(()));
+
+    let other_sid = ServerId::from_spki(b"elsewhere");
+    let other_bot = BotSeed::from_bytes(&[3; 32]).bot_key(&sid).public();
+    for changed in [
+        BotAuthTranscript {
+            challenge: &[0xc2; 32],
+            ..transcript
+        },
+        BotAuthTranscript {
+            exporter: &[0xe3; 32],
+            ..transcript
+        },
+        BotAuthTranscript {
+            server_id: &other_sid,
+            ..transcript
+        },
+        BotAuthTranscript {
+            bot_pub: &other_bot,
+            ..transcript
+        },
+    ] {
+        assert_eq!(changed.verify(&signature), Err(IdentityError::BadSignature));
+    }
+    let mut flipped = signature;
+    flipped[10] ^= 1;
+    assert_eq!(
+        transcript.verify(&flipped),
+        Err(IdentityError::BadSignature)
+    );
+
+    // A device signature over the same connection never passes as a bot's:
+    // the prefixes differ even for the same key bytes.
+    let device_key = DeviceSecret::from_bytes(&std::array::from_fn(|i| i as u8)).device_key(&sid);
+    let device_pub = device_key.public();
+    let account = vector_seed().account_key(&sid).public();
+    let device_signature = device_key
+        .sign_auth(&AuthTranscript {
+            server_id: &sid,
+            challenge: &[0xc1; 32],
+            exporter: &[0xe2; 32],
+            account_pub: &account,
+            device_pub: &device_pub,
+        })
+        .unwrap();
+    assert_eq!(
+        BotAuthTranscript {
+            bot_pub: &device_pub,
+            ..transcript
+        }
+        .verify(&device_signature),
+        Err(IdentityError::BadSignature)
+    );
+
+    // A bot key never signs a transcript naming another key.
+    assert_eq!(
+        BotSeed::from_bytes(&[2; 32])
+            .bot_key(&sid)
+            .sign_auth(&transcript),
+        Err(IdentityError::BadKey)
+    );
+
+    // The connection binding stays out of Debug; the key shows.
+    let shown = format!("{transcript:?}");
+    assert!(!shown.contains("c1c1") && !shown.contains("193"), "{shown}");
+    assert!(!shown.contains("e2e2") && !shown.contains("226"), "{shown}");
+    assert!(shown.contains(&hex(&bot_pub.to_bytes())), "{shown}");
+    assert!(format!("{key:?}").starts_with("BotKey(PublicKey("));
+}
+
+/// `verify_strict` for bots too: a small-order-R signature over the bot
+/// transcript is refused (§ 6.2, § 6.15).
+#[test]
+fn a_non_canonical_bot_signature_is_refused() {
+    let sid = server_id();
+    let signing = hand_derived(b"yapsta/bot/v1", &std::array::from_fn(|i| i as u8));
+    let bot_pub = PublicKey::from_slice(signing.verifying_key().as_bytes()).unwrap();
+    assert_eq!(bot_pub, vector_bot_seed().bot_key(&sid).public());
+    let transcript = BotAuthTranscript {
+        server_id: &sid,
+        challenge: &[7; 32],
+        exporter: &[8; 32],
+        bot_pub: &bot_pub,
+    };
+    let forged = forge_small_order_r(&signing, &transcript.to_bytes());
+    assert_eq!(transcript.verify(&forged), Err(IdentityError::BadSignature));
+}
