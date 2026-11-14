@@ -236,6 +236,9 @@ message Event {
     // only.
     MediaTrackAdded media_track_added = 27;
     MediaTrackRemoved media_track_removed = 28;
+    // M8 (§ 6.15): to every member, after a bot's register_commands. Minor 8
+    // only.
+    CommandsUpdated commands_updated = 29;
   }
 }
 
@@ -281,6 +284,9 @@ message Ephemeral {
     // M7 (§ 6.6): to the owning session when the server ends its track or
     // subscription. Minor 7 only.
     MediaEnded media_ended = 7;
+    // M8 (§ 6.15): to the bot's session when a member invokes one of its
+    // commands. Minor 8 only.
+    Interaction interaction = 8;
   }
 }
 
@@ -673,6 +679,10 @@ message Command {
     CreateBot create_bot = 60;
     RotateBot rotate_bot = 61;
     DeleteBot delete_bot = 62;
+    RegisterCommands register_commands = 63;
+    InvokeCommand invoke_command = 64;
+    CreateWebhook create_webhook = 65;
+    DeleteWebhook delete_webhook = 66;
   }
 }
 
@@ -867,6 +877,7 @@ message CommandResult {
     MediaOffer media_offer = 9;
     // M8 (§ 6.15).
     BotCreated bot_created = 10;
+    WebhookCreated webhook_created = 11;
   }
 }
 
@@ -903,6 +914,8 @@ message Request {
     TurnCredentialsRequest turn_credentials = 15;
     // M8 (§ 6.15).
     BotListRequest bot_list = 16;
+    CommandListRequest command_list = 17;
+    WebhookListRequest webhook_list = 18;
   }
 }
 
@@ -947,6 +960,8 @@ message Response {
     TurnCredentials turn_credentials = 10;
     // M8 (§ 6.15).
     BotList bot_list = 11;
+    CommandList command_list = 12;
+    WebhookList webhook_list = 13;
   }
 }
 
@@ -987,6 +1002,10 @@ message Message {
   // A tombstone: no content, mentions, attachments or reactions.
   bool deleted = 12;
   bool pinned = 13;
+  // M8 (§ 6.15): set on a webhook's message, whose author_id is 0.
+  optional uint64 webhook_id = 14;
+  // The webhook's name when it posted: user text.
+  optional string webhook_name = 15;
 }
 
 message Mentions {
@@ -1420,6 +1439,8 @@ enum AuditAction {
   AUDIT_ACTION_BOT_CREATE = 17;
   AUDIT_ACTION_BOT_ROTATE = 18;
   AUDIT_ACTION_BOT_DELETE = 19;
+  AUDIT_ACTION_WEBHOOK_CREATE = 20;
+  AUDIT_ACTION_WEBHOOK_DELETE = 21;
 }
 
 message AuditEntry {
@@ -1626,3 +1647,121 @@ message DeleteBot {
 }
 
 message BotListRequest {}
+
+// --- M8: slash commands and webhooks (§ 6.15) ---
+
+enum CommandOptionKind {
+  COMMAND_OPTION_KIND_UNSPECIFIED = 0;
+  COMMAND_OPTION_KIND_STRING = 1;
+  COMMAND_OPTION_KIND_INTEGER = 2;
+  COMMAND_OPTION_KIND_BOOLEAN = 3;
+  COMMAND_OPTION_KIND_MEMBER = 4;
+  COMMAND_OPTION_KIND_CHANNEL = 5;
+}
+
+message CommandOption {
+  // 1-32 bytes of a-z, 0-9, _ and -; unique within the command.
+  string name = 1;
+  // 1-100 bytes, the display-name rules: user text.
+  string description = 2;
+  CommandOptionKind kind = 3;
+  // Required options come before optional ones.
+  bool required = 4;
+}
+
+message SlashCommand {
+  // 1-32 bytes of a-z, 0-9, _ and -; unique within the set.
+  string name = 1;
+  // 1-100 bytes, the display-name rules: user text.
+  string description = 2;
+  // At most 10.
+  repeated CommandOption options = 3;
+}
+
+// `command_list`: one bot's set, in registration order.
+message CommandList {
+  uint64 bot_account_id = 1;
+  repeated SlashCommand commands = 2;
+}
+
+// One option of an invocation: user text, never stored or logged.
+message CommandOptionValue {
+  string name = 1;
+  oneof value {
+    // STRING: 1-1,000 bytes.
+    string text = 2;
+    sint64 integer = 3;
+    bool boolean = 4;
+    // MEMBER.
+    uint64 account_id = 5;
+    // CHANNEL.
+    uint64 channel_id = 6;
+  }
+}
+
+// To the bot's session: a member invoked one of its commands.
+message Interaction {
+  uint64 invoker_id = 1;
+  uint64 channel_id = 2;
+  string name = 3;
+  repeated CommandOptionValue options = 4;
+}
+
+// Payload-free apart from the bot: clients fetch its set with command_list.
+message CommandsUpdated {
+  uint64 bot_account_id = 1;
+}
+
+// An incoming webhook, as listed: never its token.
+message Webhook {
+  uint64 id = 1;
+  // A text channel.
+  uint64 channel_id = 2;
+  // The display-name rules: user text.
+  string name = 3;
+  uint64 created_by = 4;
+  // Unix seconds.
+  uint64 created_at = 5;
+}
+
+// `create_webhook`: the webhook and its token, a secret returned once.
+message WebhookCreated {
+  Webhook webhook = 1;
+  // `<id>.<secret>`: 16 hex characters, a dot, 26 base32 characters.
+  string token = 2;
+}
+
+message WebhookList {
+  // By id ascending.
+  repeated Webhook webhooks = 1;
+}
+
+// A bot session's whole set of commands; an empty list removes them all.
+message RegisterCommands {
+  // At most 50.
+  repeated SlashCommand commands = 1;
+}
+
+message InvokeCommand {
+  uint64 bot_account_id = 1;
+  uint64 channel_id = 2;
+  string name = 3;
+  repeated CommandOptionValue options = 4;
+}
+
+message CreateWebhook {
+  // A text channel.
+  uint64 channel_id = 1;
+  // The display-name rules (§ 6.8).
+  string name = 2;
+}
+
+message DeleteWebhook {
+  uint64 webhook_id = 1;
+}
+
+message CommandListRequest {
+  uint64 bot_account_id = 1;
+}
+
+message WebhookListRequest {}

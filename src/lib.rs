@@ -199,6 +199,10 @@ pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
         Kind::CreateBot(_) => "create_bot",
         Kind::RotateBot(_) => "rotate_bot",
         Kind::DeleteBot(_) => "delete_bot",
+        Kind::RegisterCommands(_) => "register_commands",
+        Kind::InvokeCommand(_) => "invoke_command",
+        Kind::CreateWebhook(_) => "create_webhook",
+        Kind::DeleteWebhook(_) => "delete_webhook",
     }
 }
 
@@ -267,7 +271,13 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::AnswerMedia(_)
         | Kind::UnsubscribeMedia(_) => 7,
         // § 6.15.
-        Kind::CreateBot(_) | Kind::RotateBot(_) | Kind::DeleteBot(_) => 8,
+        Kind::CreateBot(_)
+        | Kind::RotateBot(_)
+        | Kind::DeleteBot(_)
+        | Kind::RegisterCommands(_)
+        | Kind::InvokeCommand(_)
+        | Kind::CreateWebhook(_)
+        | Kind::DeleteWebhook(_) => 8,
     }
 }
 
@@ -289,7 +299,7 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         // § 6.6.
         Kind::TurnCredentials(_) => 7,
         // § 6.15.
-        Kind::BotList(_) => 8,
+        Kind::BotList(_) | Kind::CommandList(_) | Kind::WebhookList(_) => 8,
     }
 }
 

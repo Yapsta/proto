@@ -23,6 +23,10 @@ use crate::v1::{
     Welcome, emoji_ref, redeem, welcome,
 };
 use crate::v1::{Bot, BotCreated, BotCredential, CreateBot};
+use crate::v1::{
+    CommandOption, CommandOptionKind, CommandOptionValue, CreateWebhook, Interaction,
+    InvokeCommand, SlashCommand, Webhook, WebhookCreated, command_option_value,
+};
 use crate::v1::{MediaKind, MediaOffer, MediaPublished, PublishMedia, TurnCredentials};
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -58,8 +62,11 @@ impl<E: TryFrom<i32> + fmt::Debug> fmt::Debug for Enum<E> {
 /// compile error here): `text` shows a string or bytes field's length only,
 /// `opt_text` the same for an optional one, `kind` a `ChannelKind`, `purpose`
 /// an `ImagePurpose`, `style` / `access` a `SpaceStyle` / `VoiceChatAccess`
-/// (`opt_style` / `opt_access` the optional ones), and a bare field prints as
-/// it is.
+/// (`opt_style` / `opt_access` the optional ones), `option_kind` a
+/// `CommandOptionKind`, `command_name` a command or option name only when it
+/// has § 6.15's form (1–32 bytes of `a`–`z`, `0`–`9`, `_`, `-`; otherwise its
+/// length), `count` a list by its length (option values), and a bare field
+/// prints as it is.
 macro_rules! redacting_debug {
     ($message:ident { $($field:ident $(: $how:ident)?),* $(,)? }) => {
         impl fmt::Debug for $message {
@@ -84,6 +91,9 @@ macro_rules! redacting_debug {
     (@show $field:ident opt_policy) => { $field.map(known::<JoinPolicy>) };
     (@show $field:ident media) => { known::<MediaKind>(*$field) };
     (@show $field:ident texts) => { $field.iter().map(|t| Redacted(t.len())).collect::<Vec<_>>() };
+    (@show $field:ident option_kind) => { known::<CommandOptionKind>(*$field) };
+    (@show $field:ident command_name) => { CommandName($field) };
+    (@show $field:ident count) => { Count($field.len()) };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -377,6 +387,8 @@ redacting_debug!(Message {
     edited_at,
     deleted,
     pinned,
+    webhook_id,
+    webhook_name: opt_text,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -500,3 +512,96 @@ redacting_debug!(BotCredential {
     bot_pub,
     signature: text
 });
+
+// M8 (§ 6.15): slash commands and webhooks. A webhook's token is a secret
+// shown once; webhook names and command descriptions are user text. An
+// invocation (`InvokeCommand`, `Interaction`, `CommandOptionValue`) shows ids,
+// the command and option names and the number of options, never an option's
+// value.
+
+/// A command or option name: shown when it has the form § 6.15 allows (1-32
+/// bytes of `a`-`z`, `0`-`9`, `_` and `-`), so a name that is not one (a
+/// peer's free text in its place) shows by length only.
+struct CommandName<'a>(&'a str);
+
+impl fmt::Debug for CommandName<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = self.0;
+        let plain = (1..=32).contains(&name.len())
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-');
+        if plain {
+            name.fmt(f)
+        } else {
+            Redacted(name.len()).fmt(f)
+        }
+    }
+}
+
+/// Stands in for a list whose entries are not shown: their number only.
+struct Count(usize);
+
+impl fmt::Debug for Count {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<{} options>", self.0)
+    }
+}
+
+redacting_debug!(CommandOption {
+    name: command_name,
+    description: text,
+    kind: option_kind,
+    required,
+});
+redacting_debug!(SlashCommand {
+    name: command_name,
+    description: text,
+    options,
+});
+redacting_debug!(Interaction {
+    invoker_id,
+    channel_id,
+    name: command_name,
+    options: count,
+});
+redacting_debug!(InvokeCommand {
+    bot_account_id,
+    channel_id,
+    name: command_name,
+    options: count,
+});
+redacting_debug!(Webhook {
+    id,
+    channel_id,
+    name: text,
+    created_by,
+    created_at,
+});
+redacting_debug!(WebhookCreated {
+    webhook,
+    token: text
+});
+redacting_debug!(CreateWebhook {
+    channel_id,
+    name: text
+});
+
+/// The option's name and the kind of its value, never the value.
+impl fmt::Debug for CommandOptionValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use command_option_value::Value;
+        let Self { name, value } = self;
+        let kind = value.as_ref().map(|value| match value {
+            Value::Text(_) => "Text",
+            Value::Integer(_) => "Integer",
+            Value::Boolean(_) => "Boolean",
+            Value::AccountId(_) => "AccountId",
+            Value::ChannelId(_) => "ChannelId",
+        });
+        f.debug_struct("CommandOptionValue")
+            .field("name", &CommandName(name))
+            .field("value", &kind)
+            .finish()
+    }
+}
