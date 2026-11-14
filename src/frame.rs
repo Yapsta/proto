@@ -10,6 +10,12 @@ use tokio_util::codec::{Decoder, Encoder};
 use crate::v1::{Envelope, ErrorCode};
 use crate::{MAX_CONTROL_FRAME, MAX_REQUEST_FRAME};
 
+/// `Envelope` body fields only a server ever sends (§ 6.16): `error`,
+/// `hello`, `welcome`, `event`, `ephemeral`, `ack`, `resync`,
+/// `command_result`, `response`. A server refuses a client frame carrying
+/// any of them before decoding it.
+const SERVER_ONLY_BODIES: [u32; 9] = [3, 4, 6, 7, 8, 10, 13, 15, 17];
+
 const PREFIX: usize = 4;
 /// The most the decoder asks to reserve ahead of the bytes received. `BytesMut`
 /// may round a reservation up, so the buffer stays within about twice the bytes
@@ -45,6 +51,12 @@ impl FrameError {
 #[derive(Debug, Clone, Copy)]
 pub struct FrameCodec {
     max: usize,
+    /// The decoding limit: `max`, or less while a server restricts a
+    /// client (§ 6.16). Encoding always uses `max`.
+    max_in: usize,
+    /// A server reading a client: frames carrying a server-only body are
+    /// refused before they are decoded.
+    from_client: bool,
 }
 
 impl FrameCodec {
@@ -61,10 +73,53 @@ impl FrameCodec {
     /// Frames of at most `max` bytes (the prefix not counted), capped at
     /// `u32::MAX`, the largest length the prefix can carry.
     pub fn with_limit(max: usize) -> Self {
+        let max = max.min(u32::MAX as usize);
         Self {
-            max: max.min(u32::MAX as usize),
+            max,
+            max_in: max,
+            from_client: false,
         }
     }
+
+    /// A server's control stream, reading a client: 1 MiB, and a frame
+    /// carrying a body only a server sends is `INVALID` before it is
+    /// decoded (§ 6.16).
+    pub fn server_control() -> Self {
+        Self {
+            from_client: true,
+            ..Self::control()
+        }
+    }
+
+    /// Restricts (or, with `false`, frees) what is decoded to
+    /// [`MAX_RESTRICTED_FRAME`]: before `Welcome` and for a non-member
+    /// (§ 6.16). Encoding keeps the full limit.
+    pub fn restrict(&mut self, restricted: bool) {
+        self.max_in = if restricted {
+            self.max.min(crate::MAX_RESTRICTED_FRAME)
+        } else {
+            self.max
+        };
+    }
+}
+
+/// Whether `body` (an encoded `Envelope`) carries a field only a server
+/// sends. Walks the top-level tags only, skipping each value; a malformed
+/// frame is left for the decoder to refuse.
+fn carries_server_body(mut body: &[u8]) -> bool {
+    use prost::encoding::{DecodeContext, decode_key, skip_field};
+    while !body.is_empty() {
+        let Ok((tag, wire_type)) = decode_key(&mut body) else {
+            return false;
+        };
+        if SERVER_ONLY_BODIES.contains(&tag) {
+            return true;
+        }
+        if skip_field(wire_type, tag, &mut body, DecodeContext::default()).is_err() {
+            return false;
+        }
+    }
+    false
 }
 
 impl Decoder for FrameCodec {
@@ -80,10 +135,10 @@ impl Decoder for FrameCodec {
             return Ok(None);
         };
         let len = u32::from_be_bytes([prefix[0], prefix[1], prefix[2], prefix[3]]);
-        if u64::from(len) > self.max as u64 {
+        if u64::from(len) > self.max_in as u64 {
             return Err(FrameError::TooLarge {
                 len: len.into(),
-                max: self.max,
+                max: self.max_in,
             });
         }
         let len = len as usize;
@@ -95,6 +150,9 @@ impl Decoder for FrameCodec {
         }
         src.advance(PREFIX);
         let body = src.split_to(len);
+        if self.from_client && carries_server_body(&body) {
+            return Err(FrameError::Invalid);
+        }
         Envelope::decode(body.freeze())
             .map(Some)
             .map_err(|_| FrameError::Invalid)
@@ -340,5 +398,128 @@ mod tests {
             Err(FrameError::TooLarge { .. })
         ));
         assert!(buf.is_empty());
+    }
+
+    /// One frame's bytes: the prefix, then `body` as given.
+    fn raw_frame(body: &[u8]) -> BytesMut {
+        let mut buf = BytesMut::new();
+        buf.put_u32(u32::try_from(body.len()).unwrap());
+        buf.extend_from_slice(body);
+        buf
+    }
+
+    /// An empty length-delimited field `tag`, its key encoded as a varint.
+    fn empty_field(tag: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        prost::encoding::encode_key(tag, prost::encoding::WireType::LengthDelimited, &mut out);
+        out.push(0);
+        out
+    }
+
+    /// An `Envelope` whose `resync` (field 13) is `members` empty `Member`s,
+    /// two bytes each on the wire (audit H2).
+    fn member_packed(members: usize) -> Vec<u8> {
+        let mut snapshot = Vec::with_capacity(members * 2);
+        for _ in 0..members {
+            // `Snapshot.members` (7), length 0.
+            snapshot.extend_from_slice(&[(7 << 3) | 2, 0]);
+        }
+        let mut body = vec![(13 << 3) | 2];
+        prost::encoding::encode_varint(snapshot.len() as u64, &mut body);
+        body.extend(snapshot);
+        body
+    }
+
+    #[test]
+    fn a_restricted_codec_refuses_a_large_frame_on_its_prefix() {
+        let mut codec = FrameCodec::server_control();
+        codec.restrict(true);
+        // About 1 MiB of empty members: refused on the prefix, nothing read.
+        let mut buf = raw_frame(&member_packed(500_000));
+        let before = buf.len();
+        assert!(matches!(
+            codec.decode(&mut buf),
+            Err(FrameError::TooLarge { max, .. }) if max == crate::MAX_RESTRICTED_FRAME
+        ));
+        assert_eq!(buf.len(), before, "nothing consumed");
+        // Freed, the same length is within the 1 MiB limit again.
+        codec.restrict(false);
+        let mut buf = raw_frame(&[]);
+        assert!(codec.decode(&mut buf).unwrap().is_some());
+    }
+
+    #[test]
+    fn a_server_refuses_a_server_only_body_before_decoding_it() {
+        let mut codec = FrameCodec::server_control();
+        // The audit's frame, under 1 MiB: `resync` packed with empty
+        // members. Decoded, it would expand to some 100 MiB of `Member`s.
+        let mut buf = raw_frame(&member_packed(500_000));
+        assert!(matches!(codec.decode(&mut buf), Err(FrameError::Invalid)));
+        // Every server-only body, even empty, and one hidden behind other
+        // fields (a later oneof field wins in protobuf).
+        for tag in SERVER_ONLY_BODIES {
+            let mut buf = raw_frame(&empty_field(tag));
+            assert!(
+                matches!(codec.decode(&mut buf), Err(FrameError::Invalid)),
+                "field {tag}"
+            );
+            // A `request_id`, a `Ping` (11), then the server-only body.
+            let mut hidden = vec![1 << 3, 7];
+            hidden.extend(empty_field(11));
+            hidden.extend(empty_field(tag));
+            let mut buf = raw_frame(&hidden);
+            assert!(
+                matches!(codec.decode(&mut buf), Err(FrameError::Invalid)),
+                "field {tag} after a Ping"
+            );
+        }
+        // A client's bodies, and a field this version does not know, decode.
+        let mut buf = BytesMut::new();
+        codec.encode(&ping(3), &mut buf).unwrap();
+        assert_eq!(codec.decode(&mut buf).unwrap(), Some(ping(3)));
+        let mut buf = raw_frame(&empty_field(99));
+        assert_eq!(codec.decode(&mut buf).unwrap().unwrap().body, None);
+        // A client's codec decodes what a server sends.
+        let mut buf = raw_frame(&empty_field(13));
+        assert!(FrameCodec::control().decode(&mut buf).unwrap().is_some());
+    }
+
+    #[test]
+    fn the_largest_legal_auth_fits_the_restricted_cap() {
+        use crate::v1::{Auth, ClientInfo, DeviceCredential, Resume, SignedDeviceList, auth};
+        let auth = Auth {
+            version: u32::MAX,
+            credential: Some(auth::Credential::Device(DeviceCredential {
+                account_pub: vec![0xff; 32],
+                device_list: Some(SignedDeviceList {
+                    body: vec![0xff; crate::identity::MAX_DEVICE_LIST_BODY],
+                    signature: vec![0xff; 64],
+                }),
+                device_pub: vec![0xff; 32],
+                signature: vec![0xff; 64],
+            })),
+            // Each the largest varint an enum value takes.
+            capabilities: vec![i32::MIN; 64],
+            client_info: Some(ClientInfo {
+                name: "n".repeat(64),
+                version: "v".repeat(64),
+            }),
+            presence: Some(i32::MIN),
+            resume: Some(Resume {
+                token: vec![0xff; 32],
+                last_seq: u64::MAX,
+            }),
+        };
+        let frame = Envelope {
+            request_id: u32::MAX,
+            last: true,
+            body: Some(Body::Auth(auth)),
+        };
+        assert!(frame.encoded_len() < 18 * 1024, "{}", frame.encoded_len());
+        let mut codec = FrameCodec::server_control();
+        codec.restrict(true);
+        let mut buf = BytesMut::new();
+        FrameCodec::control().encode(&frame, &mut buf).unwrap();
+        assert_eq!(codec.decode(&mut buf).unwrap(), Some(frame));
     }
 }
