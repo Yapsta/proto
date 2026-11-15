@@ -239,6 +239,9 @@ message Event {
     // M8 (§ 6.15): to every member, after a bot's register_commands. Minor 8
     // only.
     CommandsUpdated commands_updated = 29;
+    // M9 (§ 6.16): to the sessions that see the channel, after delete_thread.
+    // Minor 9 only.
+    ThreadDeleted thread_deleted = 30;
   }
 }
 
@@ -683,6 +686,8 @@ message Command {
     InvokeCommand invoke_command = 64;
     CreateWebhook create_webhook = 65;
     DeleteWebhook delete_webhook = 66;
+    // M9 (§ 6.16).
+    DeleteThread delete_thread = 67;
   }
 }
 
@@ -1441,6 +1446,23 @@ enum AuditAction {
   AUDIT_ACTION_BOT_DELETE = 19;
   AUDIT_ACTION_WEBHOOK_CREATE = 20;
   AUDIT_ACTION_WEBHOOK_DELETE = 21;
+  // M9 (§ 6.16): management actions.
+  AUDIT_ACTION_ROLE_CREATE = 22;
+  AUDIT_ACTION_ROLE_UPDATE = 23;
+  AUDIT_ACTION_ROLE_MOVE = 24;
+  AUDIT_ACTION_ROLE_DELETE = 25;
+  AUDIT_ACTION_MEMBER_ROLE_ADD = 26;
+  AUDIT_ACTION_MEMBER_ROLE_REMOVE = 27;
+  AUDIT_ACTION_OVERWRITE_SET = 28;
+  AUDIT_ACTION_OVERWRITE_DELETE = 29;
+  AUDIT_ACTION_CHANNEL_CREATE = 30;
+  AUDIT_ACTION_CHANNEL_UPDATE = 31;
+  AUDIT_ACTION_CHANNEL_MOVE = 32;
+  AUDIT_ACTION_CHANNEL_DELETE = 33;
+  AUDIT_ACTION_INVITE_CREATE = 34;
+  AUDIT_ACTION_INVITE_REVOKE = 35;
+  AUDIT_ACTION_THREAD_DELETE = 36;
+  AUDIT_ACTION_TEMPLATE_APPLY = 37;
 }
 
 message AuditEntry {
@@ -1765,3 +1787,13 @@ message CommandListRequest {
 }
 
 message WebhookListRequest {}
+
+// M9 (§ 6.16): minor 9.
+message DeleteThread {
+  uint64 thread_id = 1;
+}
+
+message ThreadDeleted {
+  uint64 channel_id = 1;
+  uint64 thread_id = 2;
+}

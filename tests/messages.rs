@@ -1441,6 +1441,37 @@ fn m8_wire_b_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// M9 (§ 6.16): `delete_thread` and `thread_deleted`, the minor's whole new surface besides
+/// the `AuditAction` values ([`m9_audit_actions_are_pinned`]).
+fn m9_examples() -> Vec<(&'static str, Envelope)> {
+    vec![
+        (
+            "m9_delete_thread",
+            Envelope {
+                request_id: 160,
+                last: false,
+                body: Some(Body::Command(Command {
+                    kind: Some(command::Kind::DeleteThread(DeleteThread { thread_id: 161 })),
+                })),
+            },
+        ),
+        (
+            "m9_event_thread_deleted",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Event(Event {
+                    seq: 33,
+                    kind: Some(event::Kind::ThreadDeleted(ThreadDeleted {
+                        channel_id: 5,
+                        thread_id: 161,
+                    })),
+                })),
+            },
+        ),
+    ]
+}
+
 fn media_track() -> MediaTrack {
     MediaTrack {
         media_id: 7,
@@ -2238,6 +2269,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m7_media_examples())
     .chain(m8_examples())
     .chain(m8_wire_b_examples())
+    .chain(m9_examples())
     .collect()
 }
 
@@ -2336,8 +2368,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 8);
-    assert_eq!(SUPPORTED_MINORS, [8, 7]);
+    assert_eq!(MINOR_VERSION, 9);
+    assert_eq!(SUPPORTED_MINORS, [9, 8]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -3078,4 +3110,60 @@ fn webhook_tokens_names_and_option_values_are_only_redacted_in_debug() {
         ..CommandOption::default()
     };
     assert!(format!("{newer:?}").contains("Unknown(99)"), "{newer:?}");
+}
+
+/// § 6.16: `delete_thread` is command 67 and minor 9; `thread_deleted` is event 30, sent by
+/// the server (minor 1 as a body; the session keeps it from minor 8).
+#[test]
+fn m9_kinds_are_minor_9_at_their_numbers() {
+    use yapsta_proto::minor_of;
+    for (name, env) in m9_examples() {
+        let bytes = env.encode_to_vec();
+        let body = env.body.unwrap();
+        let (expected, tag) = match &body {
+            // Command (field 9 of the envelope) carrying kind 67.
+            Body::Command(_) => (9, 67u64 << 3 | 2),
+            // Event (field 7) carrying kind 30.
+            _ => (1, 30u64 << 3 | 2),
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+        let mut varint = Vec::new();
+        prost::encoding::encode_varint(tag, &mut varint);
+        assert!(
+            bytes.windows(varint.len()).any(|w| w == varint),
+            "{name}: kind tag {tag} on the wire"
+        );
+    }
+    assert_eq!(
+        yapsta_proto::command_kind_name(&command::Kind::DeleteThread(DeleteThread::default())),
+        "delete_thread"
+    );
+}
+
+/// § 6.16: the management audit actions are 22–37, in the spec's order.
+#[test]
+fn m9_audit_actions_are_pinned() {
+    let names = [
+        "ROLE_CREATE",
+        "ROLE_UPDATE",
+        "ROLE_MOVE",
+        "ROLE_DELETE",
+        "MEMBER_ROLE_ADD",
+        "MEMBER_ROLE_REMOVE",
+        "OVERWRITE_SET",
+        "OVERWRITE_DELETE",
+        "CHANNEL_CREATE",
+        "CHANNEL_UPDATE",
+        "CHANNEL_MOVE",
+        "CHANNEL_DELETE",
+        "INVITE_CREATE",
+        "INVITE_REVOKE",
+        "THREAD_DELETE",
+        "TEMPLATE_APPLY",
+    ];
+    for (number, name) in (22..).zip(names) {
+        let action = AuditAction::try_from(number).unwrap();
+        assert_eq!(action.as_str_name(), format!("AUDIT_ACTION_{name}"));
+    }
+    assert!(AuditAction::try_from(38).is_err());
 }

@@ -8,13 +8,29 @@ enum yapsta.v1.AuditAction.AUDIT_ACTION_BAN = 4
 enum yapsta.v1.AuditAction.AUDIT_ACTION_BOT_CREATE = 17
 enum yapsta.v1.AuditAction.AUDIT_ACTION_BOT_DELETE = 19
 enum yapsta.v1.AuditAction.AUDIT_ACTION_BOT_ROTATE = 18
+enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_CREATE = 30
+enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_DELETE = 33
+enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_MOVE = 32
+enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_UPDATE = 31
 enum yapsta.v1.AuditAction.AUDIT_ACTION_ERASE = 9
 enum yapsta.v1.AuditAction.AUDIT_ACTION_EXPORT = 8
+enum yapsta.v1.AuditAction.AUDIT_ACTION_INVITE_CREATE = 34
+enum yapsta.v1.AuditAction.AUDIT_ACTION_INVITE_REVOKE = 35
 enum yapsta.v1.AuditAction.AUDIT_ACTION_JOIN_POLICY_CHANGED = 15
 enum yapsta.v1.AuditAction.AUDIT_ACTION_KICK = 3
+enum yapsta.v1.AuditAction.AUDIT_ACTION_MEMBER_ROLE_ADD = 26
+enum yapsta.v1.AuditAction.AUDIT_ACTION_MEMBER_ROLE_REMOVE = 27
 enum yapsta.v1.AuditAction.AUDIT_ACTION_OPEN_JOIN_ROLES_CHANGED = 16
+enum yapsta.v1.AuditAction.AUDIT_ACTION_OVERWRITE_DELETE = 29
+enum yapsta.v1.AuditAction.AUDIT_ACTION_OVERWRITE_SET = 28
 enum yapsta.v1.AuditAction.AUDIT_ACTION_RESET_OWNER = 14
 enum yapsta.v1.AuditAction.AUDIT_ACTION_RESTORE = 11
+enum yapsta.v1.AuditAction.AUDIT_ACTION_ROLE_CREATE = 22
+enum yapsta.v1.AuditAction.AUDIT_ACTION_ROLE_DELETE = 25
+enum yapsta.v1.AuditAction.AUDIT_ACTION_ROLE_MOVE = 24
+enum yapsta.v1.AuditAction.AUDIT_ACTION_ROLE_UPDATE = 23
+enum yapsta.v1.AuditAction.AUDIT_ACTION_TEMPLATE_APPLY = 37
+enum yapsta.v1.AuditAction.AUDIT_ACTION_THREAD_DELETE = 36
 enum yapsta.v1.AuditAction.AUDIT_ACTION_TIMEOUT_CLEAR = 7
 enum yapsta.v1.AuditAction.AUDIT_ACTION_TIMEOUT_SET = 6
 enum yapsta.v1.AuditAction.AUDIT_ACTION_TRANSFER_MEMBER = 1
@@ -223,6 +239,7 @@ field yapsta.v1.Command.delete_emoji = 41 singular .yapsta.v1.DeleteEmoji oneof 
 field yapsta.v1.Command.delete_message = 30 singular .yapsta.v1.DeleteMessage oneof kind
 field yapsta.v1.Command.delete_overwrite = 18 singular .yapsta.v1.DeleteOverwrite oneof kind
 field yapsta.v1.Command.delete_role = 14 singular .yapsta.v1.DeleteRole oneof kind
+field yapsta.v1.Command.delete_thread = 67 singular .yapsta.v1.DeleteThread oneof kind
 field yapsta.v1.Command.delete_webhook = 66 singular .yapsta.v1.DeleteWebhook oneof kind
 field yapsta.v1.Command.disconnect_member = 47 singular .yapsta.v1.DisconnectMember oneof kind
 field yapsta.v1.Command.edit_message = 29 singular .yapsta.v1.EditMessage oneof kind
@@ -335,6 +352,7 @@ field yapsta.v1.DeleteOverwrite.account_id = 3 singular uint64 oneof target
 field yapsta.v1.DeleteOverwrite.channel_id = 1 singular uint64
 field yapsta.v1.DeleteOverwrite.role_id = 2 singular uint64 oneof target
 field yapsta.v1.DeleteRole.role_id = 1 singular uint64
+field yapsta.v1.DeleteThread.thread_id = 1 singular uint64
 field yapsta.v1.DeleteWebhook.webhook_id = 1 singular uint64
 field yapsta.v1.DeviceCredential.account_pub = 1 singular bytes
 field yapsta.v1.DeviceCredential.device_list = 2 singular .yapsta.v1.SignedDeviceList
@@ -409,6 +427,7 @@ field yapsta.v1.Event.role_updated = 8 singular .yapsta.v1.RoleUpdated oneof kin
 field yapsta.v1.Event.seq = 1 singular uint64
 field yapsta.v1.Event.space_updated = 3 singular .yapsta.v1.SpaceUpdated oneof kind
 field yapsta.v1.Event.thread_created = 21 singular .yapsta.v1.ThreadCreated oneof kind
+field yapsta.v1.Event.thread_deleted = 30 singular .yapsta.v1.ThreadDeleted oneof kind
 field yapsta.v1.Event.thread_updated = 22 singular .yapsta.v1.ThreadUpdated oneof kind
 field yapsta.v1.Event.voice_state_updated = 26 singular .yapsta.v1.VoiceStateUpdated oneof kind
 field yapsta.v1.FetchAttachmentRequest.attachment_id = 1 singular uint64
@@ -701,6 +720,8 @@ field yapsta.v1.Thread.created_by = 5 singular uint64
 field yapsta.v1.Thread.id = 1 singular uint64
 field yapsta.v1.Thread.name = 3 singular string
 field yapsta.v1.ThreadCreated.thread = 1 singular .yapsta.v1.Thread
+field yapsta.v1.ThreadDeleted.channel_id = 1 singular uint64
+field yapsta.v1.ThreadDeleted.thread_id = 2 singular uint64
 field yapsta.v1.ThreadList.has_more = 2 singular bool
 field yapsta.v1.ThreadList.threads = 1 repeated .yapsta.v1.Thread
 field yapsta.v1.ThreadUpdated.thread = 1 singular .yapsta.v1.Thread
@@ -839,6 +860,7 @@ message yapsta.v1.DeleteEmoji
 message yapsta.v1.DeleteMessage
 message yapsta.v1.DeleteOverwrite
 message yapsta.v1.DeleteRole
+message yapsta.v1.DeleteThread
 message yapsta.v1.DeleteWebhook
 message yapsta.v1.DeviceCredential
 message yapsta.v1.DeviceEntry
@@ -949,6 +971,7 @@ message yapsta.v1.StartTyping
 message yapsta.v1.SubscribeMedia
 message yapsta.v1.Thread
 message yapsta.v1.ThreadCreated
+message yapsta.v1.ThreadDeleted
 message yapsta.v1.ThreadList
 message yapsta.v1.ThreadUpdated
 message yapsta.v1.TimeoutMember
