@@ -3,7 +3,7 @@
 //! anything is reserved or read, so a peer cannot make the receiver allocate
 //! more than the limit.
 
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use prost::Message;
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -217,6 +217,43 @@ impl Encoder<Envelope> for FrameCodec {
     }
 }
 
+/// An [`Envelope`] encoded already (no length prefix): one frame written to
+/// many streams is encoded once, and each stream copies its bytes. Cloning
+/// shares them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Encoded(Bytes);
+
+impl Encoded {
+    pub fn of(envelope: &Envelope) -> Self {
+        Self(Bytes::from(envelope.encode_to_vec()))
+    }
+
+    /// The encoded envelope, shared.
+    pub fn bytes(&self) -> &Bytes {
+        &self.0
+    }
+}
+
+impl Encoder<Encoded> for FrameCodec {
+    type Error = FrameError;
+
+    /// The same frame as encoding the envelope, held to the same limit.
+    fn encode(&mut self, item: Encoded, dst: &mut BytesMut) -> Result<(), FrameError> {
+        let len = item.0.len();
+        if len > self.max {
+            return Err(FrameError::TooLarge {
+                len: len as u64,
+                max: self.max,
+            });
+        }
+        dst.reserve(PREFIX + len);
+        // `len` fits: the limit is at most u32::MAX (`with_limit`).
+        dst.put_u32(len as u32);
+        dst.extend_from_slice(&item.0);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,6 +265,27 @@ mod tests {
             last: true,
             body: Some(Body::Ping(Ping {})),
         }
+    }
+
+    /// An envelope encoded once writes the same frame as encoding it on
+    /// the stream, and is held to the same limit.
+    #[test]
+    fn an_encoded_envelope_writes_the_same_frame() {
+        let envelope = ping(7);
+        let mut direct = BytesMut::new();
+        FrameCodec::control()
+            .encode(&envelope, &mut direct)
+            .unwrap();
+        let mut shared = BytesMut::new();
+        let encoded = Encoded::of(&envelope);
+        FrameCodec::control()
+            .encode(encoded.clone(), &mut shared)
+            .unwrap();
+        assert_eq!(shared, direct);
+        assert_eq!(encoded.bytes().len() + PREFIX, direct.len());
+
+        let over = FrameCodec::with_limit(encoded.bytes().len() - 1).encode(encoded, &mut shared);
+        assert!(matches!(over, Err(FrameError::TooLarge { .. })), "{over:?}");
     }
 
     #[test]
