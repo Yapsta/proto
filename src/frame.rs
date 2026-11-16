@@ -3,7 +3,7 @@
 //! anything is reserved or read, so a peer cannot make the receiver allocate
 //! more than the limit.
 
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use prost::Message;
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -195,16 +195,7 @@ impl Encoder<&Envelope> for FrameCodec {
     type Error = FrameError;
 
     fn encode(&mut self, item: &Envelope, dst: &mut BytesMut) -> Result<(), FrameError> {
-        let len = item.encoded_len();
-        if len > self.max {
-            return Err(FrameError::TooLarge {
-                len: len as u64,
-                max: self.max,
-            });
-        }
-        dst.reserve(PREFIX + len);
-        // `len` fits: the limit is at most u32::MAX (`with_limit`).
-        dst.put_u32(len as u32);
+        self.prefix(item.encoded_len(), dst)?;
         item.encode(dst).map_err(|_| FrameError::Invalid)
     }
 }
@@ -214,6 +205,59 @@ impl Encoder<Envelope> for FrameCodec {
 
     fn encode(&mut self, item: Envelope, dst: &mut BytesMut) -> Result<(), FrameError> {
         self.encode(&item, dst)
+    }
+}
+
+/// An [`Envelope`] encoded already (no length prefix): one frame written to
+/// many streams is encoded once, and each stream copies its bytes. Cloning
+/// shares them. They hold content: `Debug` shows their length only.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Encoded(Bytes);
+
+impl std::fmt::Debug for Encoded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Encoded")
+            .field("len", &self.0.len())
+            .finish()
+    }
+}
+
+impl Encoded {
+    pub fn of(envelope: &Envelope) -> Self {
+        Self(Bytes::from(envelope.encode_to_vec()))
+    }
+
+    /// The encoded envelope, shared.
+    pub fn bytes(&self) -> &Bytes {
+        &self.0
+    }
+}
+
+impl Encoder<Encoded> for FrameCodec {
+    type Error = FrameError;
+
+    /// The same frame as encoding the envelope, held to the same limit.
+    fn encode(&mut self, item: Encoded, dst: &mut BytesMut) -> Result<(), FrameError> {
+        self.prefix(item.0.len(), dst)?;
+        dst.extend_from_slice(&item.0);
+        Ok(())
+    }
+}
+
+impl FrameCodec {
+    /// Refuses a body of `len` bytes over the limit; else reserves the
+    /// frame's room and writes its prefix.
+    fn prefix(&self, len: usize, dst: &mut BytesMut) -> Result<(), FrameError> {
+        if len > self.max {
+            return Err(FrameError::TooLarge {
+                len: len as u64,
+                max: self.max,
+            });
+        }
+        dst.reserve(PREFIX + len);
+        // `len` fits: the limit is at most u32::MAX (`with_limit`).
+        dst.put_u32(len as u32);
+        Ok(())
     }
 }
 
@@ -228,6 +272,37 @@ mod tests {
             last: true,
             body: Some(Body::Ping(Ping {})),
         }
+    }
+
+    /// An envelope encoded once writes the same frame as encoding it on
+    /// the stream, and is held to the same limit.
+    #[test]
+    fn an_encoded_envelope_writes_the_same_frame() {
+        let envelope = ping(7);
+        let mut direct = BytesMut::new();
+        FrameCodec::control()
+            .encode(&envelope, &mut direct)
+            .unwrap();
+        let mut shared = BytesMut::new();
+        let encoded = Encoded::of(&envelope);
+        FrameCodec::control()
+            .encode(encoded.clone(), &mut shared)
+            .unwrap();
+        assert_eq!(shared, direct);
+        assert_eq!(encoded.bytes().len() + PREFIX, direct.len());
+
+        // The limit is inclusive, as for an envelope.
+        let len = encoded.bytes().len();
+        let mut sink = BytesMut::new();
+        assert!(
+            FrameCodec::with_limit(len)
+                .encode(encoded.clone(), &mut sink)
+                .is_ok()
+        );
+        let over = FrameCodec::with_limit(len - 1).encode(encoded.clone(), &mut sink);
+        assert!(matches!(over, Err(FrameError::TooLarge { .. })), "{over:?}");
+        // Its `Debug` shows no byte of it.
+        assert_eq!(format!("{encoded:?}"), format!("Encoded {{ len: {len} }}"));
     }
 
     #[test]
