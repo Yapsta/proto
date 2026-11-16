@@ -22,21 +22,25 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 8 = M8. Minor
+/// The newest minor version this crate defines (§ 6.7): 9 = M9. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 8 must handle the
-/// M8 surface (bots, § 6.15).
-pub const MINOR_VERSION: u32 = 8;
+/// not this constant by default: a client that speaks minor 9 must handle the
+/// M9 surface (`thread_deleted`, § 6.16).
+pub const MINOR_VERSION: u32 = 9;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 6 (M6) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[8, 7];
+/// The current and the previous one; minor 7 (M7) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[9, 8];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
 
 /// Largest frame on a QUIC request stream (§ 6.1).
 pub const MAX_REQUEST_FRAME: usize = 16 * 1024 * 1024;
+/// Largest frame a client may send before its `Welcome`, and on a
+/// non-member session (§ 6.1, § 6.16). The largest legal `Auth` is under
+/// 18 KiB.
+pub const MAX_RESTRICTED_FRAME: usize = 32 * 1024;
 
 /// An error or close code as received. A newer peer can send codes this
 /// version does not know; those are errors, never a normal close.
@@ -203,6 +207,7 @@ pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
         Kind::InvokeCommand(_) => "invoke_command",
         Kind::CreateWebhook(_) => "create_webhook",
         Kind::DeleteWebhook(_) => "delete_webhook",
+        Kind::DeleteThread(_) => "delete_thread",
     }
 }
 
@@ -278,6 +283,8 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::InvokeCommand(_)
         | Kind::CreateWebhook(_)
         | Kind::DeleteWebhook(_) => 8,
+        // § 6.16.
+        Kind::DeleteThread(_) => 9,
     }
 }
 
