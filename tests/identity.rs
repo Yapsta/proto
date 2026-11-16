@@ -765,3 +765,14 @@ fn a_non_canonical_bot_signature_is_refused() {
     let forged = forge_small_order_r(&signing, &transcript.to_bytes());
     assert_eq!(transcript.verify(&forged), Err(IdentityError::BadSignature));
 }
+
+/// Two unheld keys (§ 6.16) differ and are valid Ed25519 public keys.
+#[test]
+fn unheld_keys_are_fresh_public_keys() {
+    let (a, b) = (
+        yapsta_proto::identity::unheld_key().unwrap(),
+        yapsta_proto::identity::unheld_key().unwrap(),
+    );
+    assert_ne!(a, b);
+    assert!(ed25519_dalek::VerifyingKey::from_bytes(&a).is_ok());
+}

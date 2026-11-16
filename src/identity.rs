@@ -551,6 +551,14 @@ impl fmt::Debug for BotAuthTranscript<'_> {
     }
 }
 
+/// The public key of an Ed25519 key pair made from OS randomness whose
+/// secret is dropped at once (§ 6.16): a bot re-keyed when its creator was
+/// removed authenticates with no key anyone holds, until `rotate_bot`.
+pub fn unheld_key() -> Result<[u8; 32], IdentityError> {
+    let secret = random()?;
+    Ok(SigningKey::from_bytes(&secret).verifying_key().to_bytes())
+}
+
 fn random() -> Result<Zeroizing<[u8; 32]>, IdentityError> {
     let mut bytes = Zeroizing::new([0; 32]);
     getrandom::fill(&mut bytes[..]).map_err(|_| IdentityError::Rng)?;
