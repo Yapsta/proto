@@ -554,9 +554,12 @@ impl fmt::Debug for BotAuthTranscript<'_> {
 /// The public key of an Ed25519 key pair made from OS randomness whose
 /// secret is dropped at once (§ 6.16): a bot re-keyed when its creator was
 /// removed authenticates with no key anyone holds, until `rotate_bot`.
-pub fn unheld_key() -> Result<[u8; 32], IdentityError> {
-    let secret = random()?;
-    Ok(SigningKey::from_bytes(&secret).verifying_key().to_bytes())
+/// `None` when the OS has no randomness. The seed is `Zeroizing`; the
+/// expanded `SigningKey` dropped here is wiped by ed25519-dalek's `zeroize`
+/// feature, which the workspace enables (Cargo.toml) and must keep.
+pub fn unheld_key() -> Option<[u8; 32]> {
+    let secret = random().ok()?;
+    Some(SigningKey::from_bytes(&secret).verifying_key().to_bytes())
 }
 
 fn random() -> Result<Zeroizing<[u8; 32]>, IdentityError> {
