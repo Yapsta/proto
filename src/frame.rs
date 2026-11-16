@@ -195,16 +195,7 @@ impl Encoder<&Envelope> for FrameCodec {
     type Error = FrameError;
 
     fn encode(&mut self, item: &Envelope, dst: &mut BytesMut) -> Result<(), FrameError> {
-        let len = item.encoded_len();
-        if len > self.max {
-            return Err(FrameError::TooLarge {
-                len: len as u64,
-                max: self.max,
-            });
-        }
-        dst.reserve(PREFIX + len);
-        // `len` fits: the limit is at most u32::MAX (`with_limit`).
-        dst.put_u32(len as u32);
+        self.prefix(item.encoded_len(), dst)?;
         item.encode(dst).map_err(|_| FrameError::Invalid)
     }
 }
@@ -219,9 +210,17 @@ impl Encoder<Envelope> for FrameCodec {
 
 /// An [`Envelope`] encoded already (no length prefix): one frame written to
 /// many streams is encoded once, and each stream copies its bytes. Cloning
-/// shares them.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// shares them. They hold content: `Debug` shows their length only.
+#[derive(Clone, PartialEq, Eq)]
 pub struct Encoded(Bytes);
+
+impl std::fmt::Debug for Encoded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Encoded")
+            .field("len", &self.0.len())
+            .finish()
+    }
+}
 
 impl Encoded {
     pub fn of(envelope: &Envelope) -> Self {
@@ -239,7 +238,16 @@ impl Encoder<Encoded> for FrameCodec {
 
     /// The same frame as encoding the envelope, held to the same limit.
     fn encode(&mut self, item: Encoded, dst: &mut BytesMut) -> Result<(), FrameError> {
-        let len = item.0.len();
+        self.prefix(item.0.len(), dst)?;
+        dst.extend_from_slice(&item.0);
+        Ok(())
+    }
+}
+
+impl FrameCodec {
+    /// Refuses a body of `len` bytes over the limit; else reserves the
+    /// frame's room and writes its prefix.
+    fn prefix(&self, len: usize, dst: &mut BytesMut) -> Result<(), FrameError> {
         if len > self.max {
             return Err(FrameError::TooLarge {
                 len: len as u64,
@@ -249,7 +257,6 @@ impl Encoder<Encoded> for FrameCodec {
         dst.reserve(PREFIX + len);
         // `len` fits: the limit is at most u32::MAX (`with_limit`).
         dst.put_u32(len as u32);
-        dst.extend_from_slice(&item.0);
         Ok(())
     }
 }
@@ -284,8 +291,18 @@ mod tests {
         assert_eq!(shared, direct);
         assert_eq!(encoded.bytes().len() + PREFIX, direct.len());
 
-        let over = FrameCodec::with_limit(encoded.bytes().len() - 1).encode(encoded, &mut shared);
+        // The limit is inclusive, as for an envelope.
+        let len = encoded.bytes().len();
+        let mut sink = BytesMut::new();
+        assert!(
+            FrameCodec::with_limit(len)
+                .encode(encoded.clone(), &mut sink)
+                .is_ok()
+        );
+        let over = FrameCodec::with_limit(len - 1).encode(encoded.clone(), &mut sink);
         assert!(matches!(over, Err(FrameError::TooLarge { .. })), "{over:?}");
+        // Its `Debug` shows no byte of it.
+        assert_eq!(format!("{encoded:?}"), format!("Encoded {{ len: {len} }}"));
     }
 
     #[test]
