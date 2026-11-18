@@ -44,6 +44,11 @@ message Envelope {
     // M3 (minor 3).
     // Typing (§ 6.9): request_id 0, never answered.
     StartTyping start_typing = 18;
+    // M10 (minor 10, § 6.3 "Personal stream, M10"): sent only by a server,
+    // only to minor-10 member sessions; a client that sends one is refused
+    // from the tag (§ 6.16).
+    PersonalEvent personal = 19;
+    PersonalSnapshot personal_snapshot = 20;
   }
 }
 
@@ -85,6 +90,8 @@ message Error {
 // Optional features; on only when both sides list them (§ 6.2). M1 defines none.
 enum Capability {
   CAPABILITY_UNSPECIFIED = 0;
+  // M10 (§ 6.18): the server lists it only while push is on.
+  CAPABILITY_PUSH = 1;
 }
 
 // Handshake (§ 6.2).
@@ -163,6 +170,8 @@ message Resume {
   // 32 opaque bytes from the previous Welcome.
   bytes token = 1;
   uint64 last_seq = 2;
+  // M10 (§ 6.3): the highest personal seq received; ignored on minor 9.
+  optional uint64 personal_last_seq = 3;
 }
 
 message Welcome {
@@ -177,6 +186,8 @@ message Welcome {
     Snapshot snapshot = 6;
     Resumed resumed = 7;
   }
+  // M10 (§ 6.18): a member session that negotiated PUSH.
+  optional PushInfo push_info = 8;
 }
 
 // Device lists (§ 6.2). `body` is the encoded DeviceListBody exactly as signed;
@@ -688,6 +699,26 @@ message Command {
     DeleteWebhook delete_webhook = 66;
     // M9 (§ 6.16).
     DeleteThread delete_thread = 67;
+    // M10 (§ 6.17).
+    OpenDm open_dm = 68;
+    CreateGroupDm create_group_dm = 69;
+    AddDmMember add_dm_member = 70;
+    RemoveDmMember remove_dm_member = 71;
+    LeaveDm leave_dm = 72;
+    UpdateDm update_dm = 73;
+    SendDmMessage send_dm_message = 74;
+    EditDmMessage edit_dm_message = 75;
+    DeleteDmMessage delete_dm_message = 76;
+    AddDmReaction add_dm_reaction = 77;
+    RemoveDmReaction remove_dm_reaction = 78;
+    MarkDmRead mark_dm_read = 79;
+    Block block = 80;
+    Unblock unblock = 81;
+    // M10 (§ 6.18).
+    SetNotificationSetting set_notification_setting = 82;
+    RegisterPush register_push = 83;
+    UnregisterPush unregister_push = 84;
+    GoBackground go_background = 85;
   }
 }
 
@@ -921,6 +952,9 @@ message Request {
     BotListRequest bot_list = 16;
     CommandListRequest command_list = 17;
     WebhookListRequest webhook_list = 18;
+    // M10 (§ 6.17).
+    DmHistoryRequest dm_history = 19;
+    ListDmsRequest list_dms = 20;
   }
 }
 
@@ -967,6 +1001,8 @@ message Response {
     BotList bot_list = 11;
     CommandList command_list = 12;
     WebhookList webhook_list = 13;
+    // M10 (§ 6.17).
+    DmList dms = 14;
   }
 }
 
@@ -1011,6 +1047,10 @@ message Message {
   optional uint64 webhook_id = 14;
   // The webhook's name when it posted: user text.
   optional string webhook_name = 15;
+  // M10 (§ 6.17): set on a DM message, whose channel_id is 0. DM message ids
+  // are their own id space: key a DM message by (dm_id, id). Such a Message
+  // travels only in personal events and DM responses, never in an Event.
+  optional uint64 dm_id = 16;
 }
 
 message Mentions {
@@ -1321,6 +1361,8 @@ message UploadSlot {
 message StartTyping {
   uint64 channel_id = 1;
   optional uint64 thread_id = 2;
+  // M10 (§ 6.17): typing in a DM, with channel_id 0.
+  optional uint64 dm_id = 3;
 }
 
 // Events.
@@ -1390,6 +1432,8 @@ message Typing {
   uint64 channel_id = 1;
   optional uint64 thread_id = 2;
   uint64 account_id = 3;
+  // M10 (§ 6.17): typing in a DM, with channel_id 0; minor-10 sessions only.
+  optional uint64 dm_id = 4;
 }
 
 message Poke {
@@ -1796,4 +1840,260 @@ message DeleteThread {
 message ThreadDeleted {
   uint64 channel_id = 1;
   uint64 thread_id = 2;
+}
+
+// M10: DMs and the personal stream (§ 6.3, § 6.17). Fields are numbered from
+// 1 in the order § 6.17 lists them (§ 6.8).
+
+enum DmKind {
+  DM_KIND_UNSPECIFIED = 0;
+  DM_KIND_ONE_TO_ONE = 1;
+  DM_KIND_GROUP = 2;
+}
+
+message Dm {
+  uint64 id = 1;
+  DmKind kind = 2;
+  // The current members, in the order they joined.
+  repeated uint64 member_ids = 3;
+  // GROUP only (0–100 bytes): user text.
+  string name = 4;
+  // GROUP only.
+  uint64 owner_id = 5;
+  uint64 created_at = 6;
+}
+
+// One DM's read state for one account; last_message_id is the newest message
+// that account can see (§ 6.17).
+message DmReadState {
+  uint64 dm_id = 1;
+  uint64 last_read_id = 2;
+  uint32 mention_count = 3;
+  uint64 last_message_id = 4;
+}
+
+message DmList {
+  repeated Dm dms = 1;
+  bool has_more = 2;
+  repeated DmReadState read_states = 3;
+}
+
+message OpenDm {
+  uint64 account_id = 1;
+}
+
+message CreateGroupDm {
+  // 1 to 9: the others.
+  repeated uint64 account_ids = 1;
+  optional string name = 2;
+}
+
+message AddDmMember {
+  uint64 dm_id = 1;
+  uint64 account_id = 2;
+}
+
+message RemoveDmMember {
+  uint64 dm_id = 1;
+  uint64 account_id = 2;
+}
+
+message LeaveDm {
+  uint64 dm_id = 1;
+}
+
+message UpdateDm {
+  uint64 dm_id = 1;
+  string name = 2;
+}
+
+message SendDmMessage {
+  uint64 dm_id = 1;
+  string content = 2;
+  optional uint64 reply_to = 3;
+  repeated uint64 attachment_ids = 4;
+}
+
+message EditDmMessage {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+  string content = 3;
+}
+
+message DeleteDmMessage {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+}
+
+message AddDmReaction {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+  EmojiRef emoji = 3;
+}
+
+message RemoveDmReaction {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+  EmojiRef emoji = 3;
+}
+
+message MarkDmRead {
+  uint64 dm_id = 1;
+  // 0 = nothing read.
+  uint64 message_id = 2;
+}
+
+message Block {
+  uint64 account_id = 1;
+}
+
+message Unblock {
+  uint64 account_id = 1;
+}
+
+message DmHistoryRequest {
+  uint64 dm_id = 1;
+  // Absent = the newest messages.
+  oneof anchor {
+    uint64 before = 2;
+    uint64 after = 3;
+    uint64 around = 4;
+  }
+  // 1 to 100.
+  uint32 limit = 5;
+}
+
+message ListDmsRequest {
+  // The last page's last entry; both or neither.
+  optional uint64 before_message_id = 1;
+  optional uint64 before_dm_id = 2;
+  // 1 to 100.
+  uint32 limit = 3;
+}
+
+// Personal events: one account's ordered stream, with its own seq (§ 6.3).
+message PersonalEvent {
+  uint64 seq = 1;
+  oneof kind {
+    DmUpdated dm_updated = 2;
+    DmRemoved dm_removed = 3;
+    MessageCreated dm_message_created = 4;
+    MessageUpdated dm_message_updated = 5;
+    DmMessageDeleted dm_message_deleted = 6;
+    DmReactionAdded dm_reaction_added = 7;
+    DmReactionRemoved dm_reaction_removed = 8;
+    DmReadState dm_read_state = 9;
+    BlockUpdated block_updated = 10;
+    // § 6.18.
+    NotificationSettingUpdated notification_setting_updated = 11;
+  }
+}
+
+message PersonalSnapshot {
+  uint64 seq = 1;
+  repeated Dm dms = 2;
+  repeated DmReadState dm_read_states = 3;
+  repeated uint64 blocked_account_ids = 4;
+  // § 6.18.
+  repeated NotificationSetting notification_settings = 5;
+}
+
+message DmUpdated {
+  Dm dm = 1;
+}
+
+message DmRemoved {
+  uint64 dm_id = 1;
+}
+
+message DmMessageDeleted {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+}
+
+message DmReactionAdded {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+  EmojiRef emoji = 3;
+  uint64 account_id = 4;
+}
+
+message DmReactionRemoved {
+  uint64 dm_id = 1;
+  uint64 message_id = 2;
+  EmojiRef emoji = 3;
+  uint64 account_id = 4;
+}
+
+message BlockUpdated {
+  uint64 account_id = 1;
+  bool blocked = 2;
+}
+
+// M10: notifications and push (§ 6.18).
+
+enum NotifyTarget {
+  NOTIFY_TARGET_UNSPECIFIED = 0;
+  NOTIFY_TARGET_SPACE = 1;
+  NOTIFY_TARGET_CHANNEL = 2;
+  NOTIFY_TARGET_DM = 3;
+}
+
+enum NotifyLevel {
+  // Inherit.
+  NOTIFY_LEVEL_UNSPECIFIED = 0;
+  NOTIFY_LEVEL_ALL = 1;
+  NOTIFY_LEVEL_MENTIONS = 2;
+  NOTIFY_LEVEL_NONE = 3;
+}
+
+message NotificationSetting {
+  NotifyTarget target = 1;
+  // The channel or DM id; 0 for SPACE.
+  uint64 target_id = 2;
+  NotifyLevel level = 3;
+  // Unix seconds; 0 = not muted.
+  uint64 muted_until = 4;
+}
+
+message NotificationSettingUpdated {
+  NotificationSetting setting = 1;
+}
+
+message SetNotificationSetting {
+  NotificationSetting setting = 1;
+}
+
+// A UnifiedPush registration (RFC 8030 push resource, RFC 8291 keys): device
+// secrets, never logged.
+message WebPushTarget {
+  string endpoint = 1;
+  // An uncompressed P-256 point, 65 bytes.
+  bytes p256dh = 2;
+  // 16 bytes.
+  bytes auth = 3;
+}
+
+// An iOS relay token issued for one instance and device: a device secret.
+message RelayTarget {
+  bytes token = 1;
+}
+
+message RegisterPush {
+  oneof target {
+    WebPushTarget web_push = 1;
+    RelayTarget relay = 2;
+  }
+}
+
+message UnregisterPush {}
+
+message GoBackground {}
+
+message PushInfo {
+  // The server's VAPID key (RFC 8292): 65 bytes, uncompressed P-256.
+  bytes vapid_public_key = 1;
+  bool relay = 2;
+  // Whether this device has a registration.
+  bool registered = 3;
 }

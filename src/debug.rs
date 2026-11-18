@@ -22,6 +22,10 @@ use crate::v1::{
     UpdateThread, UploadAttachmentRequest, UploadImageRequest, UploadSlot, VoiceChatAccess,
     Welcome, emoji_ref, redeem, welcome,
 };
+use crate::v1::{
+    BlockUpdated, CreateGroupDm, Dm, DmKind, EditDmMessage, NotificationSetting, NotifyLevel,
+    NotifyTarget, PersonalSnapshot, RelayTarget, SendDmMessage, UpdateDm, WebPushTarget,
+};
 use crate::v1::{Bot, BotCreated, BotCredential, CreateBot};
 use crate::v1::{
     CommandOption, CommandOptionKind, CommandOptionValue, CreateWebhook, Interaction,
@@ -43,6 +47,16 @@ fn redacted<T: AsRef<[u8]>>(value: &Option<T>) -> Option<Redacted> {
 }
 
 /// An enum value as received: a value from a newer peer shows as its number.
+/// An id that would say who DMs, blocks or mutes whom next to the account a
+/// frame belongs to (§ 6.17 "Content in logs"): never printed.
+struct Hidden;
+
+impl fmt::Debug for Hidden {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<hidden>")
+    }
+}
+
 struct Enum<E>(i32, PhantomData<E>);
 
 fn known<E>(value: i32) -> Enum<E> {
@@ -94,6 +108,10 @@ macro_rules! redacting_debug {
     (@show $field:ident option_kind) => { known::<CommandOptionKind>(*$field) };
     (@show $field:ident command_name) => { CommandName($field) };
     (@show $field:ident count) => { Count($field.len()) };
+    (@show $field:ident hidden) => { { let _ = $field; Hidden } };
+    (@show $field:ident dm_kind) => { known::<DmKind>(*$field) };
+    (@show $field:ident notify_target) => { known::<NotifyTarget>(*$field) };
+    (@show $field:ident notify_level) => { known::<NotifyLevel>(*$field) };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -127,10 +145,15 @@ impl fmt::Debug for SignedDeviceList {
 
 impl fmt::Debug for Resume {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { token, last_seq } = self;
+        let Self {
+            token,
+            last_seq,
+            personal_last_seq,
+        } = self;
         f.debug_struct("Resume")
             .field("token", &Redacted(token.len()))
             .field("last_seq", last_seq)
+            .field("personal_last_seq", personal_last_seq)
             .finish()
     }
 }
@@ -144,6 +167,7 @@ impl fmt::Debug for Welcome {
             resume_token,
             device_list,
             state,
+            push_info,
         } = self;
         f.debug_struct("Welcome")
             .field("session_id", session_id)
@@ -152,6 +176,7 @@ impl fmt::Debug for Welcome {
             .field("resume_token", &redacted(resume_token))
             .field("device_list", device_list)
             .field("state", state)
+            .field("push_info", push_info)
             .finish()
     }
 }
@@ -389,6 +414,7 @@ redacting_debug!(Message {
     pinned,
     webhook_id,
     webhook_name: opt_text,
+    dm_id,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -429,6 +455,55 @@ redacting_debug!(EditMessage {
     message_id,
     content: text
 });
+// M10 (§ 6.17, § 6.18): DM text and names, who is in a DM, who blocks or
+// mutes whom, and push secrets (§ 6.18 "Secrets and logs").
+redacting_debug!(Dm {
+    id,
+    kind: dm_kind,
+    member_ids: count,
+    name: text,
+    owner_id: hidden,
+    created_at,
+});
+redacting_debug!(CreateGroupDm {
+    account_ids: count,
+    name: opt_text,
+});
+redacting_debug!(UpdateDm { dm_id, name: text });
+redacting_debug!(SendDmMessage {
+    dm_id,
+    content: text,
+    reply_to,
+    attachment_ids,
+});
+redacting_debug!(EditDmMessage {
+    dm_id,
+    message_id,
+    content: text,
+});
+redacting_debug!(BlockUpdated {
+    account_id: hidden,
+    blocked,
+});
+redacting_debug!(NotificationSetting {
+    target: notify_target,
+    target_id: hidden,
+    level: notify_level,
+    muted_until,
+});
+redacting_debug!(PersonalSnapshot {
+    seq,
+    dms,
+    dm_read_states,
+    blocked_account_ids: count,
+    notification_settings,
+});
+redacting_debug!(WebPushTarget {
+    endpoint: text,
+    p256dh: text,
+    auth: text,
+});
+redacting_debug!(RelayTarget { token: text });
 redacting_debug!(CreateThread {
     message_id,
     name: text

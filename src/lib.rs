@@ -22,15 +22,15 @@ pub mod v1 {
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 9 = M9. Minor
+/// The newest minor version this crate defines (§ 6.7): 10 = M10. Minor
 /// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 9 must handle the
-/// M9 surface (`thread_deleted`, § 6.16).
-pub const MINOR_VERSION: u32 = 9;
+/// not this constant by default: a client that speaks minor 10 must handle the
+/// M10 surface (the personal stream, § 6.3; DMs, § 6.17; push, § 6.18).
+pub const MINOR_VERSION: u32 = 10;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 7 (M7) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[9, 8];
+/// The current and the previous one; minor 8 (M8) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[10, 9];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
@@ -133,6 +133,9 @@ pub fn minor_of(body: &v1::envelope::Body) -> u32 {
         Body::Command(command) => command.kind.as_ref().map_or(2, command_minor),
         Body::Request(request) => request.kind.as_ref().map_or(2, request_minor),
         Body::StartTyping(_) => 3,
+        // § 6.3: server-only bodies, refused from their tag before decoding
+        // when a client sends one (frame.rs); classified for completeness.
+        Body::Personal(_) | Body::PersonalSnapshot(_) => 10,
     }
 }
 
@@ -208,6 +211,24 @@ pub fn command_kind_name(kind: &v1::command::Kind) -> &'static str {
         Kind::CreateWebhook(_) => "create_webhook",
         Kind::DeleteWebhook(_) => "delete_webhook",
         Kind::DeleteThread(_) => "delete_thread",
+        Kind::OpenDm(_) => "open_dm",
+        Kind::CreateGroupDm(_) => "create_group_dm",
+        Kind::AddDmMember(_) => "add_dm_member",
+        Kind::RemoveDmMember(_) => "remove_dm_member",
+        Kind::LeaveDm(_) => "leave_dm",
+        Kind::UpdateDm(_) => "update_dm",
+        Kind::SendDmMessage(_) => "send_dm_message",
+        Kind::EditDmMessage(_) => "edit_dm_message",
+        Kind::DeleteDmMessage(_) => "delete_dm_message",
+        Kind::AddDmReaction(_) => "add_dm_reaction",
+        Kind::RemoveDmReaction(_) => "remove_dm_reaction",
+        Kind::MarkDmRead(_) => "mark_dm_read",
+        Kind::Block(_) => "block",
+        Kind::Unblock(_) => "unblock",
+        Kind::SetNotificationSetting(_) => "set_notification_setting",
+        Kind::RegisterPush(_) => "register_push",
+        Kind::UnregisterPush(_) => "unregister_push",
+        Kind::GoBackground(_) => "go_background",
     }
 }
 
@@ -285,6 +306,25 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::DeleteWebhook(_) => 8,
         // § 6.16.
         Kind::DeleteThread(_) => 9,
+        // § 6.17, § 6.18.
+        Kind::OpenDm(_)
+        | Kind::CreateGroupDm(_)
+        | Kind::AddDmMember(_)
+        | Kind::RemoveDmMember(_)
+        | Kind::LeaveDm(_)
+        | Kind::UpdateDm(_)
+        | Kind::SendDmMessage(_)
+        | Kind::EditDmMessage(_)
+        | Kind::DeleteDmMessage(_)
+        | Kind::AddDmReaction(_)
+        | Kind::RemoveDmReaction(_)
+        | Kind::MarkDmRead(_)
+        | Kind::Block(_)
+        | Kind::Unblock(_)
+        | Kind::SetNotificationSetting(_)
+        | Kind::RegisterPush(_)
+        | Kind::UnregisterPush(_)
+        | Kind::GoBackground(_) => 10,
     }
 }
 
@@ -307,6 +347,8 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         Kind::TurnCredentials(_) => 7,
         // § 6.15.
         Kind::BotList(_) | Kind::CommandList(_) | Kind::WebhookList(_) => 8,
+        // § 6.17.
+        Kind::DmHistory(_) | Kind::ListDms(_) => 10,
     }
 }
 

@@ -105,6 +105,7 @@ const M3_SECRETS: &[&str] = &[
 
 fn message() -> yapsta_proto::v1::Message {
     yapsta_proto::v1::Message {
+        dm_id: None,
         id: 70,
         channel_id: 5,
         thread_id: Some(69),
@@ -209,6 +210,7 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::StartTyping(StartTyping {
+                    dm_id: None,
                     channel_id: 5,
                     thread_id: Some(69),
                 }),
@@ -647,6 +649,7 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 ephemeral(ephemeral::Kind::Typing(Typing {
+                    dm_id: None,
                     channel_id: 5,
                     thread_id: None,
                     account_id: 43,
@@ -697,6 +700,7 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Welcome(Welcome {
+                    push_info: None,
                     session_id: 13,
                     account_id: Some(42),
                     membership: None,
@@ -1441,6 +1445,388 @@ fn m8_wire_b_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// M10 (§ 6.17, § 6.18): user text and device secrets the examples plant,
+/// none of which may show in `Debug`.
+const M10_SECRETS: &[&str] = &[
+    "m10-dm-secret-text",
+    "m10-dm-edit-text",
+    "m10-group-name",
+    "m10-renamed-group",
+    "m10-endpoint-secret",
+    "[109, 49, 48",
+    "[102, 102, 102",
+];
+
+fn m10_command(request_id: u32, kind: command::Kind) -> Envelope {
+    Envelope {
+        request_id,
+        last: false,
+        body: Some(Body::Command(Command { kind: Some(kind) })),
+    }
+}
+
+fn m10_personal(seq: u64, kind: personal_event::Kind) -> Envelope {
+    Envelope {
+        request_id: 0,
+        last: false,
+        body: Some(Body::Personal(PersonalEvent {
+            seq,
+            kind: Some(kind),
+        })),
+    }
+}
+
+/// M10 (§ 6.3, § 6.17, § 6.18): every new command and request, the personal
+/// bodies, `Welcome.push_info` and the DM typing fields.
+fn m10_examples() -> Vec<(&'static str, Envelope)> {
+    use command::Kind as C;
+    let dm_message = yapsta_proto::v1::Message {
+        id: 181,
+        channel_id: 0,
+        thread_id: None,
+        author_id: 171,
+        created_at: 1_700_000_100,
+        content: "m10-dm-secret-text".to_owned(),
+        reply_to: None,
+        mentions: None,
+        attachments: vec![],
+        reactions: vec![],
+        edited_at: None,
+        deleted: false,
+        pinned: false,
+        webhook_id: None,
+        webhook_name: None,
+        dm_id: Some(180),
+    };
+    let group = Dm {
+        id: 180,
+        kind: DmKind::Group.into(),
+        member_ids: vec![170, 171, 172],
+        name: "m10-group-name".to_owned(),
+        owner_id: 170,
+        created_at: 1_700_000_000,
+    };
+    let read_state = DmReadState {
+        dm_id: 180,
+        last_read_id: 181,
+        mention_count: 2,
+        last_message_id: 182,
+    };
+    let setting = NotificationSetting {
+        target: NotifyTarget::Dm.into(),
+        target_id: 180,
+        level: NotifyLevel::Mentions.into(),
+        muted_until: 1_800_000_000,
+    };
+    let emoji = Some(EmojiRef {
+        emoji: Some(emoji_ref::Emoji::CustomId(183)),
+    });
+    vec![
+        (
+            "m10_open_dm",
+            m10_command(170, C::OpenDm(OpenDm { account_id: 171 })),
+        ),
+        (
+            "m10_create_group_dm",
+            m10_command(
+                171,
+                C::CreateGroupDm(CreateGroupDm {
+                    account_ids: vec![171, 172],
+                    name: Some("m10-group-name".to_owned()),
+                }),
+            ),
+        ),
+        (
+            "m10_add_dm_member",
+            m10_command(
+                172,
+                C::AddDmMember(AddDmMember {
+                    dm_id: 180,
+                    account_id: 173,
+                }),
+            ),
+        ),
+        (
+            "m10_remove_dm_member",
+            m10_command(
+                173,
+                C::RemoveDmMember(RemoveDmMember {
+                    dm_id: 180,
+                    account_id: 173,
+                }),
+            ),
+        ),
+        (
+            "m10_leave_dm",
+            m10_command(174, C::LeaveDm(LeaveDm { dm_id: 180 })),
+        ),
+        (
+            "m10_update_dm",
+            m10_command(
+                175,
+                C::UpdateDm(UpdateDm {
+                    dm_id: 180,
+                    name: "m10-renamed-group".to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m10_send_dm_message",
+            m10_command(
+                176,
+                C::SendDmMessage(SendDmMessage {
+                    dm_id: 180,
+                    content: "m10-dm-secret-text".to_owned(),
+                    reply_to: Some(181),
+                    attachment_ids: vec![184],
+                }),
+            ),
+        ),
+        (
+            "m10_edit_dm_message",
+            m10_command(
+                177,
+                C::EditDmMessage(EditDmMessage {
+                    dm_id: 180,
+                    message_id: 181,
+                    content: "m10-dm-edit-text".to_owned(),
+                }),
+            ),
+        ),
+        (
+            "m10_delete_dm_message",
+            m10_command(
+                178,
+                C::DeleteDmMessage(DeleteDmMessage {
+                    dm_id: 180,
+                    message_id: 181,
+                }),
+            ),
+        ),
+        (
+            "m10_add_dm_reaction",
+            m10_command(
+                179,
+                C::AddDmReaction(AddDmReaction {
+                    dm_id: 180,
+                    message_id: 181,
+                    emoji: emoji.clone(),
+                }),
+            ),
+        ),
+        (
+            "m10_remove_dm_reaction",
+            m10_command(
+                180,
+                C::RemoveDmReaction(RemoveDmReaction {
+                    dm_id: 180,
+                    message_id: 181,
+                    emoji: emoji.clone(),
+                }),
+            ),
+        ),
+        (
+            "m10_mark_dm_read",
+            m10_command(
+                181,
+                C::MarkDmRead(MarkDmRead {
+                    dm_id: 180,
+                    message_id: 181,
+                }),
+            ),
+        ),
+        (
+            "m10_block",
+            m10_command(182, C::Block(Block { account_id: 171 })),
+        ),
+        (
+            "m10_unblock",
+            m10_command(183, C::Unblock(Unblock { account_id: 171 })),
+        ),
+        (
+            "m10_set_notification_setting",
+            m10_command(
+                184,
+                C::SetNotificationSetting(SetNotificationSetting {
+                    setting: Some(setting),
+                }),
+            ),
+        ),
+        (
+            "m10_register_push_web",
+            m10_command(
+                185,
+                C::RegisterPush(RegisterPush {
+                    target: Some(register_push::Target::WebPush(WebPushTarget {
+                        endpoint: "https://push.example/m10-endpoint-secret".to_owned(),
+                        p256dh: vec![4; 65],
+                        auth: vec![0x66; 16],
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m10_register_push_relay",
+            m10_command(
+                186,
+                C::RegisterPush(RegisterPush {
+                    target: Some(register_push::Target::Relay(RelayTarget {
+                        token: b"m10-relay-token".to_vec(),
+                    })),
+                }),
+            ),
+        ),
+        (
+            "m10_unregister_push",
+            m10_command(187, C::UnregisterPush(UnregisterPush {})),
+        ),
+        (
+            "m10_go_background",
+            m10_command(188, C::GoBackground(GoBackground {})),
+        ),
+        (
+            "m10_dm_history",
+            Envelope {
+                request_id: 189,
+                last: false,
+                body: Some(Body::Request(Request {
+                    kind: Some(request::Kind::DmHistory(DmHistoryRequest {
+                        dm_id: 180,
+                        anchor: Some(dm_history_request::Anchor::Before(181)),
+                        limit: 50,
+                    })),
+                })),
+            },
+        ),
+        (
+            "m10_list_dms",
+            Envelope {
+                request_id: 190,
+                last: false,
+                body: Some(Body::Request(Request {
+                    kind: Some(request::Kind::ListDms(ListDmsRequest {
+                        before_message_id: Some(182),
+                        before_dm_id: Some(180),
+                        limit: 100,
+                    })),
+                })),
+            },
+        ),
+        (
+            "m10_response_dms",
+            Envelope {
+                request_id: 190,
+                last: true,
+                body: Some(Body::Response(Response {
+                    kind: Some(response::Kind::Dms(DmList {
+                        dms: vec![group.clone()],
+                        has_more: true,
+                        read_states: vec![read_state],
+                    })),
+                })),
+            },
+        ),
+        (
+            "m10_personal_dm_updated",
+            m10_personal(
+                1,
+                personal_event::Kind::DmUpdated(DmUpdated {
+                    dm: Some(group.clone()),
+                }),
+            ),
+        ),
+        (
+            "m10_personal_dm_message_created",
+            m10_personal(
+                2,
+                personal_event::Kind::DmMessageCreated(MessageCreated {
+                    message: Some(dm_message),
+                }),
+            ),
+        ),
+        (
+            "m10_personal_block_updated",
+            m10_personal(
+                3,
+                personal_event::Kind::BlockUpdated(BlockUpdated {
+                    account_id: 171,
+                    blocked: true,
+                }),
+            ),
+        ),
+        (
+            "m10_personal_notification_setting_updated",
+            m10_personal(
+                4,
+                personal_event::Kind::NotificationSettingUpdated(NotificationSettingUpdated {
+                    setting: Some(setting),
+                }),
+            ),
+        ),
+        (
+            "m10_personal_snapshot",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::PersonalSnapshot(PersonalSnapshot {
+                    seq: 4,
+                    dms: vec![group],
+                    dm_read_states: vec![read_state],
+                    blocked_account_ids: vec![171],
+                    notification_settings: vec![setting],
+                })),
+            },
+        ),
+        (
+            "m10_welcome_push_info",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Welcome(Welcome {
+                    session_id: 191,
+                    account_id: Some(170),
+                    membership: None,
+                    resume_token: None,
+                    device_list: None,
+                    state: None,
+                    push_info: Some(PushInfo {
+                        vapid_public_key: vec![7; 65],
+                        relay: true,
+                        registered: false,
+                    }),
+                })),
+            },
+        ),
+        (
+            "m10_start_typing_dm",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::StartTyping(StartTyping {
+                    channel_id: 0,
+                    thread_id: None,
+                    dm_id: Some(180),
+                })),
+            },
+        ),
+        (
+            "m10_ephemeral_typing_dm",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Ephemeral(Ephemeral {
+                    kind: Some(ephemeral::Kind::Typing(Typing {
+                        channel_id: 0,
+                        thread_id: None,
+                        account_id: 171,
+                        dm_id: Some(180),
+                    })),
+                })),
+            },
+        ),
+    ]
+}
+
 /// M9 (§ 6.16): `delete_thread` and `thread_deleted`, the minor's whole new surface besides
 /// the `AuditAction` values ([`m9_audit_actions_are_pinned`]).
 fn m9_examples() -> Vec<(&'static str, Envelope)> {
@@ -1920,6 +2306,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                     }),
                     presence: Some(PresenceStatus::Invisible.into()),
                     resume: Some(Resume {
+                        personal_last_seq: None,
                         token: vec![4; 32],
                         last_seq: 99,
                     }),
@@ -1932,6 +2319,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Welcome(Welcome {
+                    push_info: None,
                     session_id: 11,
                     account_id: Some(42),
                     membership: Some(member()),
@@ -1952,6 +2340,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Welcome(Welcome {
+                    push_info: None,
                     session_id: 12,
                     account_id: None,
                     membership: None,
@@ -2270,6 +2659,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m8_examples())
     .chain(m8_wire_b_examples())
     .chain(m9_examples())
+    .chain(m10_examples())
     .collect()
 }
 
@@ -2368,8 +2758,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 9);
-    assert_eq!(SUPPORTED_MINORS, [9, 8]);
+    assert_eq!(MINOR_VERSION, 10);
+    assert_eq!(SUPPORTED_MINORS, [10, 9]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -2389,6 +2779,7 @@ fn debug_output_redacts_secrets_and_user_text() {
         .chain(M2_SECRETS)
         .chain(M3_SECRETS)
         .chain(M7_SECRETS)
+        .chain(M10_SECRETS)
     {
         assert!(!env.contains(text), "{text} in {env}");
     }
@@ -3166,4 +3557,68 @@ fn m9_audit_actions_are_pinned() {
         assert_eq!(action.as_str_name(), format!("AUDIT_ACTION_{name}"));
     }
     assert!(AuditAction::try_from(38).is_err());
+}
+
+/// § 6.7 "Minor 10": every M10 command (68–85) and request (19–20) is minor
+/// 10, at the number § 6.17 and § 6.18 give it; `personal` and
+/// `personal_snapshot` are envelope bodies 19 and 20.
+#[test]
+fn m10_kinds_are_minor_10_at_their_numbers() {
+    use yapsta_proto::minor_of;
+    let numbers: &[(&str, u64)] = &[
+        ("m10_open_dm", 68),
+        ("m10_create_group_dm", 69),
+        ("m10_add_dm_member", 70),
+        ("m10_remove_dm_member", 71),
+        ("m10_leave_dm", 72),
+        ("m10_update_dm", 73),
+        ("m10_send_dm_message", 74),
+        ("m10_edit_dm_message", 75),
+        ("m10_delete_dm_message", 76),
+        ("m10_add_dm_reaction", 77),
+        ("m10_remove_dm_reaction", 78),
+        ("m10_mark_dm_read", 79),
+        ("m10_block", 80),
+        ("m10_unblock", 81),
+        ("m10_set_notification_setting", 82),
+        ("m10_register_push_web", 83),
+        ("m10_register_push_relay", 83),
+        ("m10_unregister_push", 84),
+        ("m10_go_background", 85),
+        ("m10_dm_history", 19),
+        ("m10_list_dms", 20),
+    ];
+    let examples = m10_examples();
+    for (name, number) in numbers {
+        let (_, env) = examples.iter().find(|(n, _)| n == name).expect(name);
+        let body = env.body.clone().unwrap();
+        assert_eq!(minor_of(&body), 10, "{name}");
+        // The kind's tag sits right after the Command (9) or Request (16)
+        // field's length: decode the inner message and read its first key.
+        let inner = match &body {
+            Body::Command(c) => c.encode_to_vec(),
+            Body::Request(r) => r.encode_to_vec(),
+            _ => unreachable!("{name}"),
+        };
+        let (tag, _) = prost::encoding::decode_key(&mut inner.as_slice()).unwrap();
+        assert_eq!(u64::from(tag), *number, "{name}");
+    }
+    for (name, tag) in [
+        ("m10_personal_dm_updated", 19u32),
+        ("m10_personal_snapshot", 20),
+    ] {
+        let (_, env) = examples.iter().find(|(n, _)| *n == name).unwrap();
+        assert_eq!(minor_of(env.body.as_ref().unwrap()), 10, "{name}");
+        let bytes = env.encode_to_vec();
+        let (first, _) = prost::encoding::decode_key(&mut bytes.as_slice()).unwrap();
+        assert_eq!(first, tag, "{name}");
+        assert!(
+            yapsta_proto::frame::carries_server_body(&bytes),
+            "{name} is server-only"
+        );
+    }
+    assert_eq!(
+        yapsta_proto::command_kind_name(&command::Kind::GoBackground(GoBackground {})),
+        "go_background"
+    );
 }
