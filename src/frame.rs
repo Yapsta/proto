@@ -12,9 +12,10 @@ use crate::{MAX_CONTROL_FRAME, MAX_REQUEST_FRAME};
 
 /// `Envelope` body fields only a server ever sends (§ 6.16): `error`,
 /// `hello`, `welcome`, `event`, `ephemeral`, `ack`, `resync`,
-/// `command_result`, `response`. A server refuses a client frame carrying
-/// any of them before decoding it.
-pub const SERVER_ONLY_BODIES: [u32; 9] = [3, 4, 6, 7, 8, 10, 13, 15, 17];
+/// `command_result`, `response`, and from M10 `personal` and
+/// `personal_snapshot` (§ 6.3). A server refuses a client frame carrying any
+/// of them before decoding it.
+pub const SERVER_ONLY_BODIES: [u32; 11] = [3, 4, 6, 7, 8, 10, 13, 15, 17, 19, 20];
 /// `Envelope` body fields a client sends: `auth`, `set_presence`, `ping`,
 /// `redeem`, `command`, `request`, `start_typing`. Every body field is in
 /// exactly one of the two lists (a wire-surface test holds that), so a new
@@ -608,6 +609,7 @@ mod tests {
             }),
             presence: Some(i32::MIN),
             resume: Some(Resume {
+                personal_last_seq: None,
                 token: vec![0xff; 32],
                 last_seq: u64::MAX,
             }),

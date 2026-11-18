@@ -13,6 +13,12 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use crate::v1::{
+    AddDmMember, Block, BlockUpdated, CreateGroupDm, Dm, DmKind, DmReactionAdded,
+    DmReactionRemoved, EditDmMessage, NotificationSetting, NotifyLevel, NotifyTarget, OpenDm,
+    PersonalSnapshot, RelayTarget, RemoveDmMember, SendDmMessage, StartTyping, Typing, Unblock,
+    UpdateDm, WebPushTarget,
+};
+use crate::v1::{
     AnswerMedia, BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji,
     CreateRole, CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
     InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus,
@@ -40,6 +46,26 @@ impl fmt::Debug for Redacted {
 
 fn redacted<T: AsRef<[u8]>>(value: &Option<T>) -> Option<Redacted> {
     value.as_ref().map(|v| Redacted(v.as_ref().len()))
+}
+
+/// An id that would say who DMs, blocks or mutes whom next to the account a
+/// frame belongs to (§ 6.17 "Content in logs"): never printed.
+struct Hidden;
+
+impl fmt::Debug for Hidden {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<hidden>")
+    }
+}
+
+/// Stands in for a list of account ids (DM members, blocked accounts): their
+/// number only.
+struct Ids(usize);
+
+impl fmt::Debug for Ids {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<{} ids>", self.0)
+    }
 }
 
 /// An enum value as received: a value from a newer peer shows as its number.
@@ -94,6 +120,12 @@ macro_rules! redacting_debug {
     (@show $field:ident option_kind) => { known::<CommandOptionKind>(*$field) };
     (@show $field:ident command_name) => { CommandName($field) };
     (@show $field:ident count) => { Count($field.len()) };
+    (@show $field:ident hidden) => { { let _ = $field; Hidden } };
+    (@show $field:ident opt_hidden) => { $field.map(|_| Hidden) };
+    (@show $field:ident ids) => { Ids($field.len()) };
+    (@show $field:ident dm_kind) => { known::<DmKind>(*$field) };
+    (@show $field:ident notify_target) => { known::<NotifyTarget>(*$field) };
+    (@show $field:ident notify_level) => { known::<NotifyLevel>(*$field) };
 }
 
 // A decoded Error's text comes from the peer, not from `Error::new`'s
@@ -127,10 +159,15 @@ impl fmt::Debug for SignedDeviceList {
 
 impl fmt::Debug for Resume {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { token, last_seq } = self;
+        let Self {
+            token,
+            last_seq,
+            personal_last_seq,
+        } = self;
         f.debug_struct("Resume")
             .field("token", &Redacted(token.len()))
             .field("last_seq", last_seq)
+            .field("personal_last_seq", personal_last_seq)
             .finish()
     }
 }
@@ -144,6 +181,7 @@ impl fmt::Debug for Welcome {
             resume_token,
             device_list,
             state,
+            push_info,
         } = self;
         f.debug_struct("Welcome")
             .field("session_id", session_id)
@@ -152,6 +190,7 @@ impl fmt::Debug for Welcome {
             .field("resume_token", &redacted(resume_token))
             .field("device_list", device_list)
             .field("state", state)
+            .field("push_info", push_info)
             .finish()
     }
 }
@@ -389,6 +428,7 @@ redacting_debug!(Message {
     pinned,
     webhook_id,
     webhook_name: opt_text,
+    dm_id: opt_hidden,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -428,6 +468,89 @@ redacting_debug!(SendMessage {
 redacting_debug!(EditMessage {
     message_id,
     content: text
+});
+// M10 (§ 6.17, § 6.18): DM text and names, who is in a DM, who blocks or
+// mutes whom, and push secrets (§ 6.18 "Secrets and logs").
+redacting_debug!(Dm {
+    id,
+    kind: dm_kind,
+    member_ids: ids,
+    name: text,
+    owner_id: hidden,
+    created_at,
+});
+redacting_debug!(CreateGroupDm {
+    account_ids: ids,
+    name: opt_text,
+});
+redacting_debug!(UpdateDm { dm_id, name: text });
+redacting_debug!(SendDmMessage {
+    dm_id,
+    content: text,
+    reply_to,
+    attachment_ids,
+});
+redacting_debug!(EditDmMessage {
+    dm_id,
+    message_id,
+    content: text,
+});
+redacting_debug!(BlockUpdated {
+    account_id: hidden,
+    blocked,
+});
+redacting_debug!(NotificationSetting {
+    target: notify_target,
+    target_id: hidden,
+    level: notify_level,
+    muted_until,
+});
+redacting_debug!(PersonalSnapshot {
+    seq,
+    dms,
+    dm_read_states,
+    blocked_account_ids: ids,
+    notification_settings,
+});
+redacting_debug!(WebPushTarget {
+    endpoint: text,
+    p256dh: text,
+    auth: text,
+});
+redacting_debug!(RelayTarget { token: text });
+redacting_debug!(OpenDm { account_id: hidden });
+redacting_debug!(AddDmMember {
+    dm_id,
+    account_id: hidden,
+});
+redacting_debug!(RemoveDmMember {
+    dm_id,
+    account_id: hidden,
+});
+redacting_debug!(Block { account_id: hidden });
+redacting_debug!(Unblock { account_id: hidden });
+redacting_debug!(DmReactionAdded {
+    dm_id,
+    message_id,
+    emoji,
+    account_id: hidden,
+});
+redacting_debug!(DmReactionRemoved {
+    dm_id,
+    message_id,
+    emoji,
+    account_id: hidden,
+});
+redacting_debug!(StartTyping {
+    channel_id,
+    thread_id,
+    dm_id: opt_hidden,
+});
+redacting_debug!(Typing {
+    channel_id,
+    thread_id,
+    account_id,
+    dm_id: opt_hidden,
 });
 redacting_debug!(CreateThread {
     message_id,
