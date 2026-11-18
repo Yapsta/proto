@@ -1740,7 +1740,7 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
             m10_personal(
                 2,
                 personal_event::Kind::DmMessageCreated(MessageCreated {
-                    message: Some(dm_message),
+                    message: Some(dm_message.clone()),
                 }),
             ),
         ),
@@ -1821,6 +1821,122 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
                         account_id: 171,
                         dm_id: Some(180),
                     })),
+                })),
+            },
+        ),
+        (
+            "m10_dm_history_after",
+            Envelope {
+                request_id: 192,
+                last: false,
+                body: Some(Body::Request(Request {
+                    kind: Some(request::Kind::DmHistory(DmHistoryRequest {
+                        dm_id: 180,
+                        anchor: Some(dm_history_request::Anchor::After(181)),
+                        limit: 20,
+                    })),
+                })),
+            },
+        ),
+        (
+            "m10_dm_history_around",
+            Envelope {
+                request_id: 193,
+                last: false,
+                body: Some(Body::Request(Request {
+                    kind: Some(request::Kind::DmHistory(DmHistoryRequest {
+                        dm_id: 180,
+                        anchor: Some(dm_history_request::Anchor::Around(181)),
+                        limit: 30,
+                    })),
+                })),
+            },
+        ),
+        (
+            "m10_personal_dm_removed",
+            m10_personal(5, personal_event::Kind::DmRemoved(DmRemoved { dm_id: 180 })),
+        ),
+        (
+            "m10_personal_dm_message_updated",
+            m10_personal(
+                6,
+                personal_event::Kind::DmMessageUpdated(MessageUpdated {
+                    message: Some(yapsta_proto::v1::Message {
+                        content: "m10-dm-edit-text".to_owned(),
+                        edited_at: Some(1_700_000_200),
+                        ..dm_message.clone()
+                    }),
+                }),
+            ),
+        ),
+        (
+            "m10_personal_dm_message_deleted",
+            m10_personal(
+                7,
+                personal_event::Kind::DmMessageDeleted(DmMessageDeleted {
+                    dm_id: 180,
+                    message_id: 181,
+                }),
+            ),
+        ),
+        (
+            "m10_personal_dm_reaction_added",
+            m10_personal(
+                8,
+                personal_event::Kind::DmReactionAdded(DmReactionAdded {
+                    dm_id: 180,
+                    message_id: 181,
+                    emoji: emoji.clone(),
+                    account_id: 172,
+                }),
+            ),
+        ),
+        (
+            "m10_personal_dm_reaction_removed",
+            m10_personal(
+                9,
+                personal_event::Kind::DmReactionRemoved(DmReactionRemoved {
+                    dm_id: 180,
+                    message_id: 181,
+                    emoji,
+                    account_id: 172,
+                }),
+            ),
+        ),
+        (
+            "m10_personal_dm_read_state",
+            m10_personal(10, personal_event::Kind::DmReadState(read_state)),
+        ),
+        (
+            "m10_hello_push",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: vec![10, 9],
+                    challenge: vec![1; 32],
+                    capabilities: vec![Capability::Push.into()],
+                    space_public_info: None,
+                })),
+            },
+        ),
+        (
+            "m10_auth_resume_personal",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Auth(Auth {
+                    version: 10,
+                    credential: None,
+                    capabilities: vec![],
+                    client_info: None,
+                    presence: None,
+                    resume: Some(Resume {
+                        token: vec![4; 32],
+                        last_seq: 99,
+                        personal_last_seq: Some(10),
+                    }),
                 })),
             },
         ),
@@ -3565,34 +3681,42 @@ fn m9_audit_actions_are_pinned() {
 #[test]
 fn m10_kinds_are_minor_10_at_their_numbers() {
     use yapsta_proto::minor_of;
-    let numbers: &[(&str, u64)] = &[
-        ("m10_open_dm", 68),
-        ("m10_create_group_dm", 69),
-        ("m10_add_dm_member", 70),
-        ("m10_remove_dm_member", 71),
-        ("m10_leave_dm", 72),
-        ("m10_update_dm", 73),
-        ("m10_send_dm_message", 74),
-        ("m10_edit_dm_message", 75),
-        ("m10_delete_dm_message", 76),
-        ("m10_add_dm_reaction", 77),
-        ("m10_remove_dm_reaction", 78),
-        ("m10_mark_dm_read", 79),
-        ("m10_block", 80),
-        ("m10_unblock", 81),
-        ("m10_set_notification_setting", 82),
-        ("m10_register_push_web", 83),
-        ("m10_register_push_relay", 83),
-        ("m10_unregister_push", 84),
-        ("m10_go_background", 85),
-        ("m10_dm_history", 19),
-        ("m10_list_dms", 20),
+    let numbers: &[(&str, u64, &str)] = &[
+        ("m10_open_dm", 68, "open_dm"),
+        ("m10_create_group_dm", 69, "create_group_dm"),
+        ("m10_add_dm_member", 70, "add_dm_member"),
+        ("m10_remove_dm_member", 71, "remove_dm_member"),
+        ("m10_leave_dm", 72, "leave_dm"),
+        ("m10_update_dm", 73, "update_dm"),
+        ("m10_send_dm_message", 74, "send_dm_message"),
+        ("m10_edit_dm_message", 75, "edit_dm_message"),
+        ("m10_delete_dm_message", 76, "delete_dm_message"),
+        ("m10_add_dm_reaction", 77, "add_dm_reaction"),
+        ("m10_remove_dm_reaction", 78, "remove_dm_reaction"),
+        ("m10_mark_dm_read", 79, "mark_dm_read"),
+        ("m10_block", 80, "block"),
+        ("m10_unblock", 81, "unblock"),
+        (
+            "m10_set_notification_setting",
+            82,
+            "set_notification_setting",
+        ),
+        ("m10_register_push_web", 83, "register_push"),
+        ("m10_register_push_relay", 83, "register_push"),
+        ("m10_unregister_push", 84, "unregister_push"),
+        ("m10_go_background", 85, "go_background"),
+        ("m10_dm_history", 19, ""),
+        ("m10_list_dms", 20, ""),
     ];
     let examples = m10_examples();
-    for (name, number) in numbers {
+    // The third column is `command_kind_name`'s (empty for a request).
+    for (name, number, kind_name) in numbers {
         let (_, env) = examples.iter().find(|(n, _)| n == name).expect(name);
         let body = env.body.clone().unwrap();
         assert_eq!(minor_of(&body), 10, "{name}");
+        if let Body::Command(Command { kind: Some(kind) }) = &body {
+            assert_eq!(yapsta_proto::command_kind_name(kind), *kind_name, "{name}");
+        }
         // The kind's tag sits right after the Command (9) or Request (16)
         // field's length: decode the inner message and read its first key.
         let inner = match &body {
@@ -3617,8 +3741,137 @@ fn m10_kinds_are_minor_10_at_their_numbers() {
             "{name} is server-only"
         );
     }
-    assert_eq!(
-        yapsta_proto::command_kind_name(&command::Kind::GoBackground(GoBackground {})),
-        "go_background"
+}
+
+/// § 6.17 "Content in logs": who DMs, blocks or mutes whom never shows in
+/// `Debug`. Each id below is spelled so nothing else in the output contains it.
+#[test]
+fn debug_output_hides_who_dms_and_blocks_whom() {
+    const WHO: u64 = 987_654_321;
+    const DM: u64 = 876_543_219;
+    let emoji = Some(EmojiRef {
+        emoji: Some(emoji_ref::Emoji::CustomId(1)),
+    });
+    let shown = [
+        format!("{:?}", OpenDm { account_id: WHO }),
+        format!("{:?}", Block { account_id: WHO }),
+        format!("{:?}", Unblock { account_id: WHO }),
+        format!(
+            "{:?}",
+            AddDmMember {
+                dm_id: 1,
+                account_id: WHO
+            }
+        ),
+        format!(
+            "{:?}",
+            RemoveDmMember {
+                dm_id: 1,
+                account_id: WHO
+            }
+        ),
+        format!(
+            "{:?}",
+            DmReactionAdded {
+                dm_id: 1,
+                message_id: 2,
+                emoji: emoji.clone(),
+                account_id: WHO
+            }
+        ),
+        format!(
+            "{:?}",
+            DmReactionRemoved {
+                dm_id: 1,
+                message_id: 2,
+                emoji,
+                account_id: WHO
+            }
+        ),
+        format!(
+            "{:?}",
+            BlockUpdated {
+                account_id: WHO,
+                blocked: true
+            }
+        ),
+        format!(
+            "{:?}",
+            NotificationSetting {
+                target: NotifyTarget::Dm.into(),
+                target_id: DM,
+                level: NotifyLevel::None.into(),
+                muted_until: 0,
+            }
+        ),
+        format!(
+            "{:?}",
+            Dm {
+                id: 1,
+                kind: DmKind::Group.into(),
+                member_ids: vec![WHO, WHO + 1],
+                name: String::new(),
+                owner_id: WHO,
+                created_at: 0,
+            }
+        ),
+        format!(
+            "{:?}",
+            CreateGroupDm {
+                account_ids: vec![WHO],
+                name: None,
+            }
+        ),
+        format!(
+            "{:?}",
+            PersonalSnapshot {
+                seq: 1,
+                dms: vec![],
+                dm_read_states: vec![],
+                blocked_account_ids: vec![WHO],
+                notification_settings: vec![],
+            }
+        ),
+        format!(
+            "{:?}",
+            StartTyping {
+                channel_id: 0,
+                thread_id: None,
+                dm_id: Some(DM),
+            }
+        ),
+        format!(
+            "{:?}",
+            Typing {
+                channel_id: 0,
+                thread_id: None,
+                account_id: 1,
+                dm_id: Some(DM),
+            }
+        ),
+        format!(
+            "{:?}",
+            yapsta_proto::v1::Message {
+                dm_id: Some(DM),
+                ..Default::default()
+            }
+        ),
+    ];
+    for out in &shown {
+        assert!(!out.contains(&WHO.to_string()), "{out}");
+        assert!(!out.contains(&DM.to_string()), "{out}");
+        assert!(out.contains("<hidden>") || out.contains(" ids>"), "{out}");
+    }
+    // Lists show their length, and an absent DM id stays visibly absent.
+    assert!(shown[9].contains("<2 ids>"), "{}", shown[9]);
+    let channel_typing = format!(
+        "{:?}",
+        Typing {
+            channel_id: 5,
+            thread_id: None,
+            account_id: 1,
+            dm_id: None,
+        }
     );
+    assert!(channel_typing.contains("dm_id: None"), "{channel_typing}");
 }

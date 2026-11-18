@@ -13,6 +13,12 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use crate::v1::{
+    AddDmMember, Block, BlockUpdated, CreateGroupDm, Dm, DmKind, DmReactionAdded,
+    DmReactionRemoved, EditDmMessage, NotificationSetting, NotifyLevel, NotifyTarget, OpenDm,
+    PersonalSnapshot, RelayTarget, RemoveDmMember, SendDmMessage, StartTyping, Typing, Unblock,
+    UpdateDm, WebPushTarget,
+};
+use crate::v1::{
     AnswerMedia, BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji,
     CreateRole, CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
     InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus,
@@ -21,10 +27,6 @@ use crate::v1::{
     SpacePublicInfo, SpaceStyle, Thread, UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace,
     UpdateThread, UploadAttachmentRequest, UploadImageRequest, UploadSlot, VoiceChatAccess,
     Welcome, emoji_ref, redeem, welcome,
-};
-use crate::v1::{
-    BlockUpdated, CreateGroupDm, Dm, DmKind, EditDmMessage, NotificationSetting, NotifyLevel,
-    NotifyTarget, PersonalSnapshot, RelayTarget, SendDmMessage, UpdateDm, WebPushTarget,
 };
 use crate::v1::{Bot, BotCreated, BotCredential, CreateBot};
 use crate::v1::{
@@ -46,7 +48,6 @@ fn redacted<T: AsRef<[u8]>>(value: &Option<T>) -> Option<Redacted> {
     value.as_ref().map(|v| Redacted(v.as_ref().len()))
 }
 
-/// An enum value as received: a value from a newer peer shows as its number.
 /// An id that would say who DMs, blocks or mutes whom next to the account a
 /// frame belongs to (§ 6.17 "Content in logs"): never printed.
 struct Hidden;
@@ -57,6 +58,17 @@ impl fmt::Debug for Hidden {
     }
 }
 
+/// Stands in for a list of account ids (DM members, blocked accounts): their
+/// number only.
+struct Ids(usize);
+
+impl fmt::Debug for Ids {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<{} ids>", self.0)
+    }
+}
+
+/// An enum value as received: a value from a newer peer shows as its number.
 struct Enum<E>(i32, PhantomData<E>);
 
 fn known<E>(value: i32) -> Enum<E> {
@@ -109,6 +121,8 @@ macro_rules! redacting_debug {
     (@show $field:ident command_name) => { CommandName($field) };
     (@show $field:ident count) => { Count($field.len()) };
     (@show $field:ident hidden) => { { let _ = $field; Hidden } };
+    (@show $field:ident opt_hidden) => { $field.map(|_| Hidden) };
+    (@show $field:ident ids) => { Ids($field.len()) };
     (@show $field:ident dm_kind) => { known::<DmKind>(*$field) };
     (@show $field:ident notify_target) => { known::<NotifyTarget>(*$field) };
     (@show $field:ident notify_level) => { known::<NotifyLevel>(*$field) };
@@ -414,7 +428,7 @@ redacting_debug!(Message {
     pinned,
     webhook_id,
     webhook_name: opt_text,
-    dm_id,
+    dm_id: opt_hidden,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -460,13 +474,13 @@ redacting_debug!(EditMessage {
 redacting_debug!(Dm {
     id,
     kind: dm_kind,
-    member_ids: count,
+    member_ids: ids,
     name: text,
     owner_id: hidden,
     created_at,
 });
 redacting_debug!(CreateGroupDm {
-    account_ids: count,
+    account_ids: ids,
     name: opt_text,
 });
 redacting_debug!(UpdateDm { dm_id, name: text });
@@ -495,7 +509,7 @@ redacting_debug!(PersonalSnapshot {
     seq,
     dms,
     dm_read_states,
-    blocked_account_ids: count,
+    blocked_account_ids: ids,
     notification_settings,
 });
 redacting_debug!(WebPushTarget {
@@ -504,6 +518,40 @@ redacting_debug!(WebPushTarget {
     auth: text,
 });
 redacting_debug!(RelayTarget { token: text });
+redacting_debug!(OpenDm { account_id: hidden });
+redacting_debug!(AddDmMember {
+    dm_id,
+    account_id: hidden,
+});
+redacting_debug!(RemoveDmMember {
+    dm_id,
+    account_id: hidden,
+});
+redacting_debug!(Block { account_id: hidden });
+redacting_debug!(Unblock { account_id: hidden });
+redacting_debug!(DmReactionAdded {
+    dm_id,
+    message_id,
+    emoji,
+    account_id: hidden,
+});
+redacting_debug!(DmReactionRemoved {
+    dm_id,
+    message_id,
+    emoji,
+    account_id: hidden,
+});
+redacting_debug!(StartTyping {
+    channel_id,
+    thread_id,
+    dm_id: opt_hidden,
+});
+redacting_debug!(Typing {
+    channel_id,
+    thread_id,
+    account_id,
+    dm_id: opt_hidden,
+});
 redacting_debug!(CreateThread {
     message_id,
     name: text
