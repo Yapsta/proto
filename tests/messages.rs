@@ -3752,111 +3752,76 @@ fn debug_output_hides_who_dms_and_blocks_whom() {
     let emoji = Some(EmojiRef {
         emoji: Some(emoji_ref::Emoji::CustomId(1)),
     });
-    let shown = [
-        format!("{:?}", OpenDm { account_id: WHO }),
-        format!("{:?}", Block { account_id: WHO }),
-        format!("{:?}", Unblock { account_id: WHO }),
-        format!(
-            "{:?}",
-            AddDmMember {
-                dm_id: 1,
-                account_id: WHO
-            }
-        ),
-        format!(
-            "{:?}",
-            RemoveDmMember {
-                dm_id: 1,
-                account_id: WHO
-            }
-        ),
-        format!(
-            "{:?}",
-            DmReactionAdded {
-                dm_id: 1,
-                message_id: 2,
-                emoji: emoji.clone(),
-                account_id: WHO
-            }
-        ),
-        format!(
-            "{:?}",
-            DmReactionRemoved {
-                dm_id: 1,
-                message_id: 2,
-                emoji,
-                account_id: WHO
-            }
-        ),
-        format!(
-            "{:?}",
-            BlockUpdated {
-                account_id: WHO,
-                blocked: true
-            }
-        ),
-        format!(
-            "{:?}",
-            NotificationSetting {
-                target: NotifyTarget::Dm.into(),
-                target_id: DM,
-                level: NotifyLevel::None.into(),
-                muted_until: 0,
-            }
-        ),
-        format!(
-            "{:?}",
-            Dm {
-                id: 1,
-                kind: DmKind::Group.into(),
-                member_ids: vec![WHO, WHO + 1],
-                name: String::new(),
-                owner_id: WHO,
-                created_at: 0,
-            }
-        ),
-        format!(
-            "{:?}",
-            CreateGroupDm {
-                account_ids: vec![WHO],
-                name: None,
-            }
-        ),
-        format!(
-            "{:?}",
-            PersonalSnapshot {
-                seq: 1,
-                dms: vec![],
-                dm_read_states: vec![],
-                blocked_account_ids: vec![WHO],
-                notification_settings: vec![],
-            }
-        ),
-        format!(
-            "{:?}",
-            StartTyping {
-                channel_id: 0,
-                thread_id: None,
-                dm_id: Some(DM),
-            }
-        ),
-        format!(
-            "{:?}",
-            Typing {
-                channel_id: 0,
-                thread_id: None,
-                account_id: 1,
-                dm_id: Some(DM),
-            }
-        ),
-        format!(
-            "{:?}",
-            yapsta_proto::v1::Message {
-                dm_id: Some(DM),
-                ..Default::default()
-            }
-        ),
+    let values: [&dyn std::fmt::Debug; 15] = [
+        &OpenDm { account_id: WHO },
+        &Block { account_id: WHO },
+        &Unblock { account_id: WHO },
+        &AddDmMember {
+            dm_id: 1,
+            account_id: WHO,
+        },
+        &RemoveDmMember {
+            dm_id: 1,
+            account_id: WHO,
+        },
+        &DmReactionAdded {
+            dm_id: 1,
+            message_id: 2,
+            emoji: emoji.clone(),
+            account_id: WHO,
+        },
+        &DmReactionRemoved {
+            dm_id: 1,
+            message_id: 2,
+            emoji,
+            account_id: WHO,
+        },
+        &BlockUpdated {
+            account_id: WHO,
+            blocked: true,
+        },
+        &NotificationSetting {
+            target: NotifyTarget::Dm.into(),
+            target_id: DM,
+            level: NotifyLevel::None.into(),
+            muted_until: 0,
+        },
+        &Dm {
+            id: 1,
+            kind: DmKind::Group.into(),
+            member_ids: vec![WHO, WHO + 1],
+            name: String::new(),
+            owner_id: WHO,
+            created_at: 0,
+        },
+        &CreateGroupDm {
+            account_ids: vec![WHO],
+            name: None,
+        },
+        &PersonalSnapshot {
+            seq: 1,
+            dms: vec![],
+            dm_read_states: vec![],
+            blocked_account_ids: vec![WHO],
+            notification_settings: vec![],
+        },
+        &StartTyping {
+            channel_id: 0,
+            thread_id: None,
+            dm_id: Some(DM),
+        },
+        &Typing {
+            channel_id: 0,
+            thread_id: None,
+            account_id: 1,
+            dm_id: Some(DM),
+        },
+        &yapsta_proto::v1::Message {
+            dm_id: Some(DM),
+            ..Default::default()
+        },
     ];
+    let shown = values.map(|v| format!("{v:?}"));
     for out in &shown {
         assert!(!out.contains(&WHO.to_string()), "{out}");
         assert!(!out.contains(&DM.to_string()), "{out}");
