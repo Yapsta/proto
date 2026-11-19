@@ -39,6 +39,7 @@ enum yapsta.v1.AuditAction.AUDIT_ACTION_UNBAN = 5
 enum yapsta.v1.AuditAction.AUDIT_ACTION_UNSPECIFIED = 0
 enum yapsta.v1.AuditAction.AUDIT_ACTION_WEBHOOK_CREATE = 20
 enum yapsta.v1.AuditAction.AUDIT_ACTION_WEBHOOK_DELETE = 21
+enum yapsta.v1.Capability.CAPABILITY_PUSH = 1
 enum yapsta.v1.Capability.CAPABILITY_UNSPECIFIED = 0
 enum yapsta.v1.ChannelKind.CHANNEL_KIND_CATEGORY = 1
 enum yapsta.v1.ChannelKind.CHANNEL_KIND_TEXT = 2
@@ -50,6 +51,9 @@ enum yapsta.v1.CommandOptionKind.COMMAND_OPTION_KIND_INTEGER = 2
 enum yapsta.v1.CommandOptionKind.COMMAND_OPTION_KIND_MEMBER = 4
 enum yapsta.v1.CommandOptionKind.COMMAND_OPTION_KIND_STRING = 1
 enum yapsta.v1.CommandOptionKind.COMMAND_OPTION_KIND_UNSPECIFIED = 0
+enum yapsta.v1.DmKind.DM_KIND_GROUP = 2
+enum yapsta.v1.DmKind.DM_KIND_ONE_TO_ONE = 1
+enum yapsta.v1.DmKind.DM_KIND_UNSPECIFIED = 0
 enum yapsta.v1.ErrorCode.ERROR_CODE_CONFLICT = 6
 enum yapsta.v1.ErrorCode.ERROR_CODE_DEVICE_EXPIRED = 12
 enum yapsta.v1.ErrorCode.ERROR_CODE_DEVICE_NOT_LISTED = 11
@@ -84,6 +88,14 @@ enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_BANNED = 3
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_KICKED = 2
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_TRANSFERRED = 1
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_UNSPECIFIED = 0
+enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_ALL = 1
+enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_MENTIONS = 2
+enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_NONE = 3
+enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_UNSPECIFIED = 0
+enum yapsta.v1.NotifyTarget.NOTIFY_TARGET_CHANNEL = 2
+enum yapsta.v1.NotifyTarget.NOTIFY_TARGET_DM = 3
+enum yapsta.v1.NotifyTarget.NOTIFY_TARGET_SPACE = 1
+enum yapsta.v1.NotifyTarget.NOTIFY_TARGET_UNSPECIFIED = 0
 enum yapsta.v1.Permission.PERMISSION_ADD_REACTIONS = 22
 enum yapsta.v1.Permission.PERMISSION_ADMINISTRATOR = 15
 enum yapsta.v1.Permission.PERMISSION_ATTACH_FILES = 21
@@ -142,6 +154,11 @@ enum yapsta.v1.StarterTemplate.STARTER_TEMPLATE_UNSPECIFIED = 0
 enum yapsta.v1.VoiceChatAccess.VOICE_CHAT_ACCESS_CHANNEL_VIEWERS = 2
 enum yapsta.v1.VoiceChatAccess.VOICE_CHAT_ACCESS_MEMBERS_IN_CHANNEL = 1
 enum yapsta.v1.VoiceChatAccess.VOICE_CHAT_ACCESS_UNSPECIFIED = 0
+field yapsta.v1.AddDmMember.account_id = 2 singular uint64
+field yapsta.v1.AddDmMember.dm_id = 1 singular uint64
+field yapsta.v1.AddDmReaction.dm_id = 1 singular uint64
+field yapsta.v1.AddDmReaction.emoji = 3 singular .yapsta.v1.EmojiRef
+field yapsta.v1.AddDmReaction.message_id = 2 singular uint64
 field yapsta.v1.AddMemberRole.account_id = 1 singular uint64
 field yapsta.v1.AddMemberRole.role_id = 2 singular uint64
 field yapsta.v1.AddReaction.emoji = 2 singular .yapsta.v1.EmojiRef
@@ -187,6 +204,9 @@ field yapsta.v1.BanPage.has_more = 2 singular bool
 field yapsta.v1.BlobData.blob_id = 1 singular uint64
 field yapsta.v1.BlobData.data = 3 singular bytes
 field yapsta.v1.BlobData.media_type = 2 singular string
+field yapsta.v1.Block.account_id = 1 singular uint64
+field yapsta.v1.BlockUpdated.account_id = 1 singular uint64
+field yapsta.v1.BlockUpdated.blocked = 2 singular bool
 field yapsta.v1.Bot.account_id = 1 singular uint64
 field yapsta.v1.Bot.created_at = 3 singular uint64
 field yapsta.v1.Bot.created_by = 4 singular uint64
@@ -220,21 +240,26 @@ field yapsta.v1.ChannelUpdated.channel = 1 singular .yapsta.v1.Channel
 field yapsta.v1.ClearWhisperList.list_id = 1 singular uint32
 field yapsta.v1.ClientInfo.name = 1 singular string
 field yapsta.v1.ClientInfo.version = 2 singular string
+field yapsta.v1.Command.add_dm_member = 70 singular .yapsta.v1.AddDmMember oneof kind
+field yapsta.v1.Command.add_dm_reaction = 77 singular .yapsta.v1.AddDmReaction oneof kind
 field yapsta.v1.Command.add_member_role = 15 singular .yapsta.v1.AddMemberRole oneof kind
 field yapsta.v1.Command.add_reaction = 31 singular .yapsta.v1.AddReaction oneof kind
 field yapsta.v1.Command.answer_media = 58 singular .yapsta.v1.AnswerMedia oneof kind
 field yapsta.v1.Command.apply_template = 50 singular .yapsta.v1.ApplyTemplate oneof kind
 field yapsta.v1.Command.ban_member = 52 singular .yapsta.v1.BanMember oneof kind
+field yapsta.v1.Command.block = 80 singular .yapsta.v1.Block oneof kind
 field yapsta.v1.Command.clear_whisper_list = 49 singular .yapsta.v1.ClearWhisperList oneof kind
 field yapsta.v1.Command.create_bot = 60 singular .yapsta.v1.CreateBot oneof kind
 field yapsta.v1.Command.create_channel = 5 singular .yapsta.v1.CreateChannel oneof kind
 field yapsta.v1.Command.create_emoji = 39 singular .yapsta.v1.CreateEmoji oneof kind
+field yapsta.v1.Command.create_group_dm = 69 singular .yapsta.v1.CreateGroupDm oneof kind
 field yapsta.v1.Command.create_invite = 23 singular .yapsta.v1.CreateInvite oneof kind
 field yapsta.v1.Command.create_role = 11 singular .yapsta.v1.CreateRole oneof kind
 field yapsta.v1.Command.create_thread = 35 singular .yapsta.v1.CreateThread oneof kind
 field yapsta.v1.Command.create_webhook = 65 singular .yapsta.v1.CreateWebhook oneof kind
 field yapsta.v1.Command.delete_bot = 62 singular .yapsta.v1.DeleteBot oneof kind
 field yapsta.v1.Command.delete_channel = 8 singular .yapsta.v1.DeleteChannel oneof kind
+field yapsta.v1.Command.delete_dm_message = 76 singular .yapsta.v1.DeleteDmMessage oneof kind
 field yapsta.v1.Command.delete_emoji = 41 singular .yapsta.v1.DeleteEmoji oneof kind
 field yapsta.v1.Command.delete_message = 30 singular .yapsta.v1.DeleteMessage oneof kind
 field yapsta.v1.Command.delete_overwrite = 18 singular .yapsta.v1.DeleteOverwrite oneof kind
@@ -242,34 +267,44 @@ field yapsta.v1.Command.delete_role = 14 singular .yapsta.v1.DeleteRole oneof ki
 field yapsta.v1.Command.delete_thread = 67 singular .yapsta.v1.DeleteThread oneof kind
 field yapsta.v1.Command.delete_webhook = 66 singular .yapsta.v1.DeleteWebhook oneof kind
 field yapsta.v1.Command.disconnect_member = 47 singular .yapsta.v1.DisconnectMember oneof kind
+field yapsta.v1.Command.edit_dm_message = 75 singular .yapsta.v1.EditDmMessage oneof kind
 field yapsta.v1.Command.edit_message = 29 singular .yapsta.v1.EditMessage oneof kind
 field yapsta.v1.Command.fetch_space_icon = 4 singular .yapsta.v1.FetchSpaceIcon oneof kind
 field yapsta.v1.Command.get_channel = 10 singular .yapsta.v1.GetChannel oneof kind
 field yapsta.v1.Command.get_member = 19 singular .yapsta.v1.GetMember oneof kind
 field yapsta.v1.Command.get_space = 1 singular .yapsta.v1.GetSpace oneof kind
+field yapsta.v1.Command.go_background = 85 singular .yapsta.v1.GoBackground oneof kind
 field yapsta.v1.Command.invoke_command = 64 singular .yapsta.v1.InvokeCommand oneof kind
 field yapsta.v1.Command.join_voice = 42 singular .yapsta.v1.JoinVoice oneof kind
 field yapsta.v1.Command.kick_member = 51 singular .yapsta.v1.KickMember oneof kind
+field yapsta.v1.Command.leave_dm = 72 singular .yapsta.v1.LeaveDm oneof kind
 field yapsta.v1.Command.leave_voice = 43 singular .yapsta.v1.LeaveVoice oneof kind
 field yapsta.v1.Command.list_invites = 24 singular .yapsta.v1.ListInvites oneof kind
+field yapsta.v1.Command.mark_dm_read = 79 singular .yapsta.v1.MarkDmRead oneof kind
 field yapsta.v1.Command.mark_read = 37 singular .yapsta.v1.MarkRead oneof kind
 field yapsta.v1.Command.move_channel = 7 singular .yapsta.v1.MoveChannel oneof kind
 field yapsta.v1.Command.move_member = 46 singular .yapsta.v1.MoveMember oneof kind
 field yapsta.v1.Command.move_role = 13 singular .yapsta.v1.MoveRole oneof kind
+field yapsta.v1.Command.open_dm = 68 singular .yapsta.v1.OpenDm oneof kind
 field yapsta.v1.Command.pin_message = 33 singular .yapsta.v1.PinMessage oneof kind
 field yapsta.v1.Command.poke = 38 singular .yapsta.v1.PokeMember oneof kind
 field yapsta.v1.Command.publish_media = 55 singular .yapsta.v1.PublishMedia oneof kind
 field yapsta.v1.Command.register_commands = 63 singular .yapsta.v1.RegisterCommands oneof kind
+field yapsta.v1.Command.register_push = 83 singular .yapsta.v1.RegisterPush oneof kind
+field yapsta.v1.Command.remove_dm_member = 71 singular .yapsta.v1.RemoveDmMember oneof kind
+field yapsta.v1.Command.remove_dm_reaction = 78 singular .yapsta.v1.RemoveDmReaction oneof kind
 field yapsta.v1.Command.remove_member_role = 16 singular .yapsta.v1.RemoveMemberRole oneof kind
 field yapsta.v1.Command.remove_reaction = 32 singular .yapsta.v1.RemoveReaction oneof kind
 field yapsta.v1.Command.rename_emoji = 40 singular .yapsta.v1.RenameEmoji oneof kind
 field yapsta.v1.Command.revoke_invite = 25 singular .yapsta.v1.RevokeInvite oneof kind
 field yapsta.v1.Command.rotate_bot = 61 singular .yapsta.v1.RotateBot oneof kind
+field yapsta.v1.Command.send_dm_message = 74 singular .yapsta.v1.SendDmMessage oneof kind
 field yapsta.v1.Command.send_message = 28 singular .yapsta.v1.SendMessage oneof kind
 field yapsta.v1.Command.set_avatar = 21 singular .yapsta.v1.SetAvatar oneof kind
 field yapsta.v1.Command.set_channel_password = 9 singular .yapsta.v1.SetChannelPassword oneof kind
 field yapsta.v1.Command.set_member_voice = 45 singular .yapsta.v1.SetMemberVoice oneof kind
 field yapsta.v1.Command.set_nickname = 22 singular .yapsta.v1.SetNickname oneof kind
+field yapsta.v1.Command.set_notification_setting = 82 singular .yapsta.v1.SetNotificationSetting oneof kind
 field yapsta.v1.Command.set_overwrite = 17 singular .yapsta.v1.SetOverwrite oneof kind
 field yapsta.v1.Command.set_space_icon = 3 singular .yapsta.v1.SetSpaceIcon oneof kind
 field yapsta.v1.Command.set_voice_state = 44 singular .yapsta.v1.SetVoiceState oneof kind
@@ -279,10 +314,13 @@ field yapsta.v1.Command.timeout_member = 54 singular .yapsta.v1.TimeoutMember on
 field yapsta.v1.Command.transfer_member = 26 singular .yapsta.v1.TransferMember oneof kind
 field yapsta.v1.Command.transfer_ownership = 27 singular .yapsta.v1.TransferOwnership oneof kind
 field yapsta.v1.Command.unban_member = 53 singular .yapsta.v1.UnbanMember oneof kind
+field yapsta.v1.Command.unblock = 81 singular .yapsta.v1.Unblock oneof kind
 field yapsta.v1.Command.unpin_message = 34 singular .yapsta.v1.UnpinMessage oneof kind
 field yapsta.v1.Command.unpublish_media = 56 singular .yapsta.v1.UnpublishMedia oneof kind
+field yapsta.v1.Command.unregister_push = 84 singular .yapsta.v1.UnregisterPush oneof kind
 field yapsta.v1.Command.unsubscribe_media = 59 singular .yapsta.v1.UnsubscribeMedia oneof kind
 field yapsta.v1.Command.update_channel = 6 singular .yapsta.v1.UpdateChannel oneof kind
+field yapsta.v1.Command.update_dm = 73 singular .yapsta.v1.UpdateDm oneof kind
 field yapsta.v1.Command.update_profile = 20 singular .yapsta.v1.UpdateProfile oneof kind
 field yapsta.v1.Command.update_role = 12 singular .yapsta.v1.UpdateRole oneof kind
 field yapsta.v1.Command.update_space = 2 singular .yapsta.v1.UpdateSpace oneof kind
@@ -328,6 +366,8 @@ field yapsta.v1.CreateChannel.temporary = 13 optional bool
 field yapsta.v1.CreateChannel.topic = 5 optional string
 field yapsta.v1.CreateEmoji.image_id = 2 singular uint64
 field yapsta.v1.CreateEmoji.name = 1 singular string
+field yapsta.v1.CreateGroupDm.account_ids = 1 repeated uint64
+field yapsta.v1.CreateGroupDm.name = 2 optional string
 field yapsta.v1.CreateInvite.expires_in_secs = 1 optional uint32
 field yapsta.v1.CreateInvite.max_uses = 2 optional uint32
 field yapsta.v1.CreateInvite.role_ids = 3 repeated uint64
@@ -346,6 +386,8 @@ field yapsta.v1.CustomEmoji.image_id = 3 singular uint64
 field yapsta.v1.CustomEmoji.name = 2 singular string
 field yapsta.v1.DeleteBot.account_id = 1 singular uint64
 field yapsta.v1.DeleteChannel.channel_id = 1 singular uint64
+field yapsta.v1.DeleteDmMessage.dm_id = 1 singular uint64
+field yapsta.v1.DeleteDmMessage.message_id = 2 singular uint64
 field yapsta.v1.DeleteEmoji.emoji_id = 1 singular uint64
 field yapsta.v1.DeleteMessage.message_id = 1 singular uint64
 field yapsta.v1.DeleteOverwrite.account_id = 3 singular uint64 oneof target
@@ -363,6 +405,39 @@ field yapsta.v1.DeviceEntry.expires_at = 2 singular uint64
 field yapsta.v1.DeviceListBody.devices = 2 repeated .yapsta.v1.DeviceEntry
 field yapsta.v1.DeviceListBody.version = 1 singular uint64
 field yapsta.v1.DisconnectMember.account_id = 1 singular uint64
+field yapsta.v1.Dm.created_at = 6 singular uint64
+field yapsta.v1.Dm.id = 1 singular uint64
+field yapsta.v1.Dm.kind = 2 singular .yapsta.v1.DmKind
+field yapsta.v1.Dm.member_ids = 3 repeated uint64
+field yapsta.v1.Dm.name = 4 singular string
+field yapsta.v1.Dm.owner_id = 5 singular uint64
+field yapsta.v1.DmHistoryRequest.after = 3 singular uint64 oneof anchor
+field yapsta.v1.DmHistoryRequest.around = 4 singular uint64 oneof anchor
+field yapsta.v1.DmHistoryRequest.before = 2 singular uint64 oneof anchor
+field yapsta.v1.DmHistoryRequest.dm_id = 1 singular uint64
+field yapsta.v1.DmHistoryRequest.limit = 5 singular uint32
+field yapsta.v1.DmList.dms = 1 repeated .yapsta.v1.Dm
+field yapsta.v1.DmList.has_more = 2 singular bool
+field yapsta.v1.DmList.read_states = 3 repeated .yapsta.v1.DmReadState
+field yapsta.v1.DmMessageDeleted.dm_id = 1 singular uint64
+field yapsta.v1.DmMessageDeleted.message_id = 2 singular uint64
+field yapsta.v1.DmReactionAdded.account_id = 4 singular uint64
+field yapsta.v1.DmReactionAdded.dm_id = 1 singular uint64
+field yapsta.v1.DmReactionAdded.emoji = 3 singular .yapsta.v1.EmojiRef
+field yapsta.v1.DmReactionAdded.message_id = 2 singular uint64
+field yapsta.v1.DmReactionRemoved.account_id = 4 singular uint64
+field yapsta.v1.DmReactionRemoved.dm_id = 1 singular uint64
+field yapsta.v1.DmReactionRemoved.emoji = 3 singular .yapsta.v1.EmojiRef
+field yapsta.v1.DmReactionRemoved.message_id = 2 singular uint64
+field yapsta.v1.DmReadState.dm_id = 1 singular uint64
+field yapsta.v1.DmReadState.last_message_id = 4 singular uint64
+field yapsta.v1.DmReadState.last_read_id = 2 singular uint64
+field yapsta.v1.DmReadState.mention_count = 3 singular uint32
+field yapsta.v1.DmRemoved.dm_id = 1 singular uint64
+field yapsta.v1.DmUpdated.dm = 1 singular .yapsta.v1.Dm
+field yapsta.v1.EditDmMessage.content = 3 singular string
+field yapsta.v1.EditDmMessage.dm_id = 1 singular uint64
+field yapsta.v1.EditDmMessage.message_id = 2 singular uint64
 field yapsta.v1.EditMessage.content = 2 singular string
 field yapsta.v1.EditMessage.message_id = 1 singular uint64
 field yapsta.v1.EmojiCreated.emoji = 1 singular .yapsta.v1.CustomEmoji
@@ -379,6 +454,8 @@ field yapsta.v1.Envelope.error = 3 singular .yapsta.v1.Error oneof body
 field yapsta.v1.Envelope.event = 7 singular .yapsta.v1.Event oneof body
 field yapsta.v1.Envelope.hello = 4 singular .yapsta.v1.Hello oneof body
 field yapsta.v1.Envelope.last = 2 singular bool
+field yapsta.v1.Envelope.personal = 19 singular .yapsta.v1.PersonalEvent oneof body
+field yapsta.v1.Envelope.personal_snapshot = 20 singular .yapsta.v1.PersonalSnapshot oneof body
 field yapsta.v1.Envelope.ping = 11 singular .yapsta.v1.Ping oneof body
 field yapsta.v1.Envelope.redeem = 12 singular .yapsta.v1.Redeem oneof body
 field yapsta.v1.Envelope.request = 16 singular .yapsta.v1.Request oneof body
@@ -462,11 +539,17 @@ field yapsta.v1.InvokeCommand.options = 4 repeated .yapsta.v1.CommandOptionValue
 field yapsta.v1.JoinVoice.channel_id = 1 singular uint64
 field yapsta.v1.JoinVoice.password = 2 optional string
 field yapsta.v1.KickMember.account_id = 1 singular uint64
+field yapsta.v1.LeaveDm.dm_id = 1 singular uint64
+field yapsta.v1.ListDmsRequest.before_dm_id = 2 optional uint64
+field yapsta.v1.ListDmsRequest.before_message_id = 1 optional uint64
+field yapsta.v1.ListDmsRequest.limit = 3 singular uint32
 field yapsta.v1.ListPinsRequest.channel_id = 1 singular uint64
 field yapsta.v1.ListThreadsRequest.archived = 2 singular bool
 field yapsta.v1.ListThreadsRequest.before_id = 3 optional uint64
 field yapsta.v1.ListThreadsRequest.channel_id = 1 singular uint64
 field yapsta.v1.ListThreadsRequest.limit = 4 singular uint32
+field yapsta.v1.MarkDmRead.dm_id = 1 singular uint64
+field yapsta.v1.MarkDmRead.message_id = 2 singular uint64
 field yapsta.v1.MarkRead.channel_id = 1 singular uint64
 field yapsta.v1.MarkRead.message_id = 2 singular uint64
 field yapsta.v1.MediaEnded.media_id = 1 singular uint64 oneof target
@@ -513,6 +596,7 @@ field yapsta.v1.Message.channel_id = 2 singular uint64
 field yapsta.v1.Message.content = 6 singular string
 field yapsta.v1.Message.created_at = 5 singular uint64
 field yapsta.v1.Message.deleted = 12 singular bool
+field yapsta.v1.Message.dm_id = 16 optional uint64
 field yapsta.v1.Message.edited_at = 11 optional uint64
 field yapsta.v1.Message.id = 1 singular uint64
 field yapsta.v1.Message.mentions = 8 singular .yapsta.v1.Mentions
@@ -546,6 +630,12 @@ field yapsta.v1.MoveMember.account_id = 1 singular uint64
 field yapsta.v1.MoveMember.channel_id = 2 singular uint64
 field yapsta.v1.MoveRole.position = 2 singular uint32
 field yapsta.v1.MoveRole.role_id = 1 singular uint64
+field yapsta.v1.NotificationSetting.level = 3 singular .yapsta.v1.NotifyLevel
+field yapsta.v1.NotificationSetting.muted_until = 4 singular uint64
+field yapsta.v1.NotificationSetting.target = 1 singular .yapsta.v1.NotifyTarget
+field yapsta.v1.NotificationSetting.target_id = 2 singular uint64
+field yapsta.v1.NotificationSettingUpdated.setting = 1 singular .yapsta.v1.NotificationSetting
+field yapsta.v1.OpenDm.account_id = 1 singular uint64
 field yapsta.v1.Overwrite.account_id = 3 singular uint64 oneof target
 field yapsta.v1.Overwrite.allow = 4 singular fixed64
 field yapsta.v1.Overwrite.channel_id = 1 singular uint64
@@ -555,6 +645,22 @@ field yapsta.v1.OverwriteDeleted.account_id = 3 singular uint64 oneof target
 field yapsta.v1.OverwriteDeleted.channel_id = 1 singular uint64
 field yapsta.v1.OverwriteDeleted.role_id = 2 singular uint64 oneof target
 field yapsta.v1.OverwriteSet.overwrite = 1 singular .yapsta.v1.Overwrite
+field yapsta.v1.PersonalEvent.block_updated = 10 singular .yapsta.v1.BlockUpdated oneof kind
+field yapsta.v1.PersonalEvent.dm_message_created = 4 singular .yapsta.v1.MessageCreated oneof kind
+field yapsta.v1.PersonalEvent.dm_message_deleted = 6 singular .yapsta.v1.DmMessageDeleted oneof kind
+field yapsta.v1.PersonalEvent.dm_message_updated = 5 singular .yapsta.v1.MessageUpdated oneof kind
+field yapsta.v1.PersonalEvent.dm_reaction_added = 7 singular .yapsta.v1.DmReactionAdded oneof kind
+field yapsta.v1.PersonalEvent.dm_reaction_removed = 8 singular .yapsta.v1.DmReactionRemoved oneof kind
+field yapsta.v1.PersonalEvent.dm_read_state = 9 singular .yapsta.v1.DmReadState oneof kind
+field yapsta.v1.PersonalEvent.dm_removed = 3 singular .yapsta.v1.DmRemoved oneof kind
+field yapsta.v1.PersonalEvent.dm_updated = 2 singular .yapsta.v1.DmUpdated oneof kind
+field yapsta.v1.PersonalEvent.notification_setting_updated = 11 singular .yapsta.v1.NotificationSettingUpdated oneof kind
+field yapsta.v1.PersonalEvent.seq = 1 singular uint64
+field yapsta.v1.PersonalSnapshot.blocked_account_ids = 4 repeated uint64
+field yapsta.v1.PersonalSnapshot.dm_read_states = 3 repeated .yapsta.v1.DmReadState
+field yapsta.v1.PersonalSnapshot.dms = 2 repeated .yapsta.v1.Dm
+field yapsta.v1.PersonalSnapshot.notification_settings = 5 repeated .yapsta.v1.NotificationSetting
+field yapsta.v1.PersonalSnapshot.seq = 1 singular uint64
 field yapsta.v1.PinMessage.message_id = 1 singular uint64
 field yapsta.v1.Poke.from_account_id = 1 singular uint64
 field yapsta.v1.Poke.text = 2 singular string
@@ -565,6 +671,9 @@ field yapsta.v1.PresenceUpdate.custom_status = 3 singular string
 field yapsta.v1.PresenceUpdate.status = 2 singular .yapsta.v1.PresenceStatus
 field yapsta.v1.PublishMedia.kind = 1 singular .yapsta.v1.MediaKind
 field yapsta.v1.PublishMedia.sdp_offer = 2 singular string
+field yapsta.v1.PushInfo.registered = 3 singular bool
+field yapsta.v1.PushInfo.relay = 2 singular bool
+field yapsta.v1.PushInfo.vapid_public_key = 1 singular bytes
 field yapsta.v1.ReactionAdded.account_id = 4 singular uint64
 field yapsta.v1.ReactionAdded.channel_id = 1 singular uint64
 field yapsta.v1.ReactionAdded.emoji = 3 singular .yapsta.v1.EmojiRef
@@ -584,6 +693,14 @@ field yapsta.v1.Redeem.claim_code = 1 singular string oneof code
 field yapsta.v1.Redeem.invite_code = 2 singular string oneof code
 field yapsta.v1.Redeem.open_join = 3 singular .yapsta.v1.OpenJoin oneof code
 field yapsta.v1.RegisterCommands.commands = 1 repeated .yapsta.v1.SlashCommand
+field yapsta.v1.RegisterPush.relay = 2 singular .yapsta.v1.RelayTarget oneof target
+field yapsta.v1.RegisterPush.web_push = 1 singular .yapsta.v1.WebPushTarget oneof target
+field yapsta.v1.RelayTarget.token = 1 singular bytes
+field yapsta.v1.RemoveDmMember.account_id = 2 singular uint64
+field yapsta.v1.RemoveDmMember.dm_id = 1 singular uint64
+field yapsta.v1.RemoveDmReaction.dm_id = 1 singular uint64
+field yapsta.v1.RemoveDmReaction.emoji = 3 singular .yapsta.v1.EmojiRef
+field yapsta.v1.RemoveDmReaction.message_id = 2 singular uint64
 field yapsta.v1.RemoveMemberRole.account_id = 1 singular uint64
 field yapsta.v1.RemoveMemberRole.role_id = 2 singular uint64
 field yapsta.v1.RemoveReaction.account_id = 3 optional uint64
@@ -596,9 +713,11 @@ field yapsta.v1.Request.audit_page = 13 singular .yapsta.v1.AuditPageRequest one
 field yapsta.v1.Request.ban_list = 14 singular .yapsta.v1.BanListRequest oneof kind
 field yapsta.v1.Request.bot_list = 16 singular .yapsta.v1.BotListRequest oneof kind
 field yapsta.v1.Request.command_list = 17 singular .yapsta.v1.CommandListRequest oneof kind
+field yapsta.v1.Request.dm_history = 19 singular .yapsta.v1.DmHistoryRequest oneof kind
 field yapsta.v1.Request.fetch_attachment = 10 singular .yapsta.v1.FetchAttachmentRequest oneof kind
 field yapsta.v1.Request.fetch_blob = 2 singular .yapsta.v1.FetchBlobRequest oneof kind
 field yapsta.v1.Request.get_messages = 5 singular .yapsta.v1.GetMessagesRequest oneof kind
+field yapsta.v1.Request.list_dms = 20 singular .yapsta.v1.ListDmsRequest oneof kind
 field yapsta.v1.Request.list_pins = 6 singular .yapsta.v1.ListPinsRequest oneof kind
 field yapsta.v1.Request.list_threads = 7 singular .yapsta.v1.ListThreadsRequest oneof kind
 field yapsta.v1.Request.member_page = 1 singular .yapsta.v1.MemberPageRequest oneof kind
@@ -614,6 +733,7 @@ field yapsta.v1.Response.ban_page = 9 singular .yapsta.v1.BanPage oneof kind
 field yapsta.v1.Response.blob = 2 singular .yapsta.v1.BlobData oneof kind
 field yapsta.v1.Response.bot_list = 11 singular .yapsta.v1.BotList oneof kind
 field yapsta.v1.Response.command_list = 12 singular .yapsta.v1.CommandList oneof kind
+field yapsta.v1.Response.dms = 14 singular .yapsta.v1.DmList oneof kind
 field yapsta.v1.Response.member_page = 1 singular .yapsta.v1.MemberPage oneof kind
 field yapsta.v1.Response.messages = 4 singular .yapsta.v1.MessageList oneof kind
 field yapsta.v1.Response.threads = 5 singular .yapsta.v1.ThreadList oneof kind
@@ -623,6 +743,7 @@ field yapsta.v1.Response.uploaded = 3 singular .yapsta.v1.Uploaded oneof kind
 field yapsta.v1.Response.url = 6 singular .yapsta.v1.SignedUrl oneof kind
 field yapsta.v1.Response.webhook_list = 13 singular .yapsta.v1.WebhookList oneof kind
 field yapsta.v1.Resume.last_seq = 2 singular uint64
+field yapsta.v1.Resume.personal_last_seq = 3 optional uint64
 field yapsta.v1.Resume.token = 1 singular bytes
 field yapsta.v1.Resumed.presences = 1 repeated .yapsta.v1.PresenceUpdate
 field yapsta.v1.Resumed.read_states = 2 repeated .yapsta.v1.ReadState
@@ -642,6 +763,10 @@ field yapsta.v1.RotateBot.account_id = 1 singular uint64
 field yapsta.v1.SearchRequest.before_id = 2 optional uint64
 field yapsta.v1.SearchRequest.limit = 3 singular uint32
 field yapsta.v1.SearchRequest.query = 1 singular string
+field yapsta.v1.SendDmMessage.attachment_ids = 4 repeated uint64
+field yapsta.v1.SendDmMessage.content = 2 singular string
+field yapsta.v1.SendDmMessage.dm_id = 1 singular uint64
+field yapsta.v1.SendDmMessage.reply_to = 3 optional uint64
 field yapsta.v1.SendMessage.attachment_ids = 5 repeated uint64
 field yapsta.v1.SendMessage.channel_id = 1 singular uint64
 field yapsta.v1.SendMessage.content = 3 singular string
@@ -655,6 +780,7 @@ field yapsta.v1.SetMemberVoice.server_deaf = 3 optional bool
 field yapsta.v1.SetMemberVoice.server_mute = 2 optional bool
 field yapsta.v1.SetNickname.account_id = 1 singular uint64
 field yapsta.v1.SetNickname.nickname = 2 optional string
+field yapsta.v1.SetNotificationSetting.setting = 1 singular .yapsta.v1.NotificationSetting
 field yapsta.v1.SetOverwrite.overwrite = 1 singular .yapsta.v1.Overwrite
 field yapsta.v1.SetPresence.afk = 2 optional bool
 field yapsta.v1.SetPresence.custom_status = 3 optional string
@@ -711,6 +837,7 @@ field yapsta.v1.SpacePublicInfo.rules = 3 singular string
 field yapsta.v1.SpacePublicInfo.style = 6 singular .yapsta.v1.SpaceStyle
 field yapsta.v1.SpaceUpdated.space = 1 singular .yapsta.v1.Space
 field yapsta.v1.StartTyping.channel_id = 1 singular uint64
+field yapsta.v1.StartTyping.dm_id = 3 optional uint64
 field yapsta.v1.StartTyping.thread_id = 2 optional uint64
 field yapsta.v1.SubscribeMedia.media_id = 1 singular uint64
 field yapsta.v1.Thread.archived = 4 singular bool
@@ -736,8 +863,10 @@ field yapsta.v1.TurnCredentials.urls = 1 repeated string
 field yapsta.v1.TurnCredentials.username = 2 singular string
 field yapsta.v1.Typing.account_id = 3 singular uint64
 field yapsta.v1.Typing.channel_id = 1 singular uint64
+field yapsta.v1.Typing.dm_id = 4 optional uint64
 field yapsta.v1.Typing.thread_id = 2 optional uint64
 field yapsta.v1.UnbanMember.account_id = 1 singular uint64
+field yapsta.v1.Unblock.account_id = 1 singular uint64
 field yapsta.v1.UnpinMessage.message_id = 1 singular uint64
 field yapsta.v1.UnpublishMedia.media_id = 1 singular uint64
 field yapsta.v1.UnsubscribeMedia.subscription_id = 1 singular uint64
@@ -751,6 +880,8 @@ field yapsta.v1.UpdateChannel.no_history = 10 optional bool
 field yapsta.v1.UpdateChannel.retention_days = 9 optional uint32
 field yapsta.v1.UpdateChannel.slowmode_secs = 4 optional uint32
 field yapsta.v1.UpdateChannel.topic = 3 optional string
+field yapsta.v1.UpdateDm.dm_id = 1 singular uint64
+field yapsta.v1.UpdateDm.name = 2 singular string
 field yapsta.v1.UpdateProfile.bio = 2 optional string
 field yapsta.v1.UpdateProfile.display_name = 1 optional string
 field yapsta.v1.UpdateProfile.pronouns = 3 optional string
@@ -796,6 +927,9 @@ field yapsta.v1.VoiceState.server_mute = 6 singular bool
 field yapsta.v1.VoiceState.session_ref = 3 singular uint32
 field yapsta.v1.VoiceStateUpdated.previous_channel_id = 2 singular uint64
 field yapsta.v1.VoiceStateUpdated.state = 1 singular .yapsta.v1.VoiceState
+field yapsta.v1.WebPushTarget.auth = 3 singular bytes
+field yapsta.v1.WebPushTarget.endpoint = 1 singular string
+field yapsta.v1.WebPushTarget.p256dh = 2 singular bytes
 field yapsta.v1.Webhook.channel_id = 2 singular uint64
 field yapsta.v1.Webhook.created_at = 5 singular uint64
 field yapsta.v1.Webhook.created_by = 4 singular uint64
@@ -807,11 +941,14 @@ field yapsta.v1.WebhookList.webhooks = 1 repeated .yapsta.v1.Webhook
 field yapsta.v1.Welcome.account_id = 2 optional uint64
 field yapsta.v1.Welcome.device_list = 5 optional .yapsta.v1.SignedDeviceList
 field yapsta.v1.Welcome.membership = 3 optional .yapsta.v1.Member
+field yapsta.v1.Welcome.push_info = 8 optional .yapsta.v1.PushInfo
 field yapsta.v1.Welcome.resume_token = 4 optional bytes
 field yapsta.v1.Welcome.resumed = 7 singular .yapsta.v1.Resumed oneof state
 field yapsta.v1.Welcome.session_id = 1 singular uint64
 field yapsta.v1.Welcome.snapshot = 6 singular .yapsta.v1.Snapshot oneof state
 message yapsta.v1.Ack
+message yapsta.v1.AddDmMember
+message yapsta.v1.AddDmReaction
 message yapsta.v1.AddMemberRole
 message yapsta.v1.AddReaction
 message yapsta.v1.AnswerMedia
@@ -827,6 +964,8 @@ message yapsta.v1.BanListRequest
 message yapsta.v1.BanMember
 message yapsta.v1.BanPage
 message yapsta.v1.BlobData
+message yapsta.v1.Block
+message yapsta.v1.BlockUpdated
 message yapsta.v1.Bot
 message yapsta.v1.BotCreated
 message yapsta.v1.BotCredential
@@ -849,6 +988,7 @@ message yapsta.v1.CommandsUpdated
 message yapsta.v1.CreateBot
 message yapsta.v1.CreateChannel
 message yapsta.v1.CreateEmoji
+message yapsta.v1.CreateGroupDm
 message yapsta.v1.CreateInvite
 message yapsta.v1.CreateRole
 message yapsta.v1.CreateThread
@@ -856,6 +996,7 @@ message yapsta.v1.CreateWebhook
 message yapsta.v1.CustomEmoji
 message yapsta.v1.DeleteBot
 message yapsta.v1.DeleteChannel
+message yapsta.v1.DeleteDmMessage
 message yapsta.v1.DeleteEmoji
 message yapsta.v1.DeleteMessage
 message yapsta.v1.DeleteOverwrite
@@ -866,6 +1007,16 @@ message yapsta.v1.DeviceCredential
 message yapsta.v1.DeviceEntry
 message yapsta.v1.DeviceListBody
 message yapsta.v1.DisconnectMember
+message yapsta.v1.Dm
+message yapsta.v1.DmHistoryRequest
+message yapsta.v1.DmList
+message yapsta.v1.DmMessageDeleted
+message yapsta.v1.DmReactionAdded
+message yapsta.v1.DmReactionRemoved
+message yapsta.v1.DmReadState
+message yapsta.v1.DmRemoved
+message yapsta.v1.DmUpdated
+message yapsta.v1.EditDmMessage
 message yapsta.v1.EditMessage
 message yapsta.v1.EmojiCreated
 message yapsta.v1.EmojiDeleted
@@ -882,6 +1033,7 @@ message yapsta.v1.GetChannel
 message yapsta.v1.GetMember
 message yapsta.v1.GetMessagesRequest
 message yapsta.v1.GetSpace
+message yapsta.v1.GoBackground
 message yapsta.v1.Hello
 message yapsta.v1.Interaction
 message yapsta.v1.Invite
@@ -890,10 +1042,13 @@ message yapsta.v1.InviteList
 message yapsta.v1.InvokeCommand
 message yapsta.v1.JoinVoice
 message yapsta.v1.KickMember
+message yapsta.v1.LeaveDm
 message yapsta.v1.LeaveVoice
+message yapsta.v1.ListDmsRequest
 message yapsta.v1.ListInvites
 message yapsta.v1.ListPinsRequest
 message yapsta.v1.ListThreadsRequest
+message yapsta.v1.MarkDmRead
 message yapsta.v1.MarkRead
 message yapsta.v1.MediaEnded
 message yapsta.v1.MediaOffer
@@ -919,22 +1074,32 @@ message yapsta.v1.MessageUpdated
 message yapsta.v1.MoveChannel
 message yapsta.v1.MoveMember
 message yapsta.v1.MoveRole
+message yapsta.v1.NotificationSetting
+message yapsta.v1.NotificationSettingUpdated
+message yapsta.v1.OpenDm
 message yapsta.v1.OpenJoin
 message yapsta.v1.Overwrite
 message yapsta.v1.OverwriteDeleted
 message yapsta.v1.OverwriteSet
+message yapsta.v1.PersonalEvent
+message yapsta.v1.PersonalSnapshot
 message yapsta.v1.PinMessage
 message yapsta.v1.Ping
 message yapsta.v1.Poke
 message yapsta.v1.PokeMember
 message yapsta.v1.PresenceUpdate
 message yapsta.v1.PublishMedia
+message yapsta.v1.PushInfo
 message yapsta.v1.ReactionAdded
 message yapsta.v1.ReactionCount
 message yapsta.v1.ReactionRemoved
 message yapsta.v1.ReadState
 message yapsta.v1.Redeem
 message yapsta.v1.RegisterCommands
+message yapsta.v1.RegisterPush
+message yapsta.v1.RelayTarget
+message yapsta.v1.RemoveDmMember
+message yapsta.v1.RemoveDmReaction
 message yapsta.v1.RemoveMemberRole
 message yapsta.v1.RemoveReaction
 message yapsta.v1.RenameEmoji
@@ -950,11 +1115,13 @@ message yapsta.v1.RoleIdList
 message yapsta.v1.RoleUpdated
 message yapsta.v1.RotateBot
 message yapsta.v1.SearchRequest
+message yapsta.v1.SendDmMessage
 message yapsta.v1.SendMessage
 message yapsta.v1.SetAvatar
 message yapsta.v1.SetChannelPassword
 message yapsta.v1.SetMemberVoice
 message yapsta.v1.SetNickname
+message yapsta.v1.SetNotificationSetting
 message yapsta.v1.SetOverwrite
 message yapsta.v1.SetPresence
 message yapsta.v1.SetSpaceIcon
@@ -981,10 +1148,13 @@ message yapsta.v1.TurnCredentials
 message yapsta.v1.TurnCredentialsRequest
 message yapsta.v1.Typing
 message yapsta.v1.UnbanMember
+message yapsta.v1.Unblock
 message yapsta.v1.UnpinMessage
 message yapsta.v1.UnpublishMedia
+message yapsta.v1.UnregisterPush
 message yapsta.v1.UnsubscribeMedia
 message yapsta.v1.UpdateChannel
+message yapsta.v1.UpdateDm
 message yapsta.v1.UpdateProfile
 message yapsta.v1.UpdateRole
 message yapsta.v1.UpdateSpace
@@ -997,6 +1167,7 @@ message yapsta.v1.Uploaded
 message yapsta.v1.VoiceSession
 message yapsta.v1.VoiceState
 message yapsta.v1.VoiceStateUpdated
+message yapsta.v1.WebPushTarget
 message yapsta.v1.Webhook
 message yapsta.v1.WebhookCreated
 message yapsta.v1.WebhookList
