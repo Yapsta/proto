@@ -1,0 +1,8 @@
+# Environment variables are read only where a build needs them (build.rs's
+# OUT_DIR); anywhere else needs an explicit #[allow].
+disallowed-methods = [
+    { path = "std::env::var", reason = "the library reads no environment" },
+    { path = "std::env::var_os", reason = "the library reads no environment" },
+    { path = "std::env::vars", reason = "the library reads no environment" },
+    { path = "std::env::vars_os", reason = "the library reads no environment" },
+]
