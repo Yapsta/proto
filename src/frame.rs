@@ -72,6 +72,9 @@ pub struct FrameCodec {
     /// The decoded limit ([`decoded_bound`]) for `max`, and for `max_in`.
     max_decoded: usize,
     max_decoded_in: usize,
+    /// Set by [`restrict`](Self::restrict); kept apart from the limits,
+    /// which need not differ when `max` is already under the restricted cap.
+    restricted: bool,
     /// A server reading a client: frames carrying a server-only body are
     /// refused before they are decoded.
     from_client: bool,
@@ -105,6 +108,7 @@ impl FrameCodec {
             max_in: max,
             max_decoded,
             max_decoded_in: max_decoded,
+            restricted: false,
             from_client: false,
             refused_server_body: false,
         }
@@ -147,7 +151,7 @@ impl FrameCodec {
 
     /// Whether frames are decoded under [`MAX_RESTRICTED_FRAME`](crate::MAX_RESTRICTED_FRAME).
     pub fn restricted(&self) -> bool {
-        self.max_in < self.max
+        self.restricted
     }
 
     /// Restricts (or, with `false`, frees) what is decoded to
@@ -155,6 +159,7 @@ impl FrameCodec {
     /// [`MAX_RESTRICTED_DECODED`]: before `Welcome` and for a non-member
     /// (§ 6.16). Encoding keeps the full limit.
     pub fn restrict(&mut self, restricted: bool) {
+        self.restricted = restricted;
         (self.max_in, self.max_decoded_in) = if restricted {
             (
                 self.max.min(crate::MAX_RESTRICTED_FRAME),
@@ -215,8 +220,11 @@ pub fn decoded_bound(body: &[u8]) -> Result<usize, FrameError> {
 /// message (they merge when decoded); through a repeated message the count
 /// is the most any one entry of it has. A packed run counts each value.
 ///
-/// `INVALID` if `body` would not decode, or `path` does not name such a
-/// chain of fields in this version's schema.
+/// `INVALID` if `path` does not name such a chain of fields in this
+/// version's schema, or if the walk cannot follow the bytes it reads along
+/// `path` (a cut-off value, or a field on the path with the wrong wire
+/// type). Fields off the path are skipped by their wire type, not checked:
+/// an `Ok` count does not mean `body` decodes.
 pub fn repeated_entries(body: &[u8], path: &[u32]) -> Result<usize, FrameError> {
     crate::bound::repeated_entries(body, path)
         .map(|n| usize::try_from(n).unwrap_or(usize::MAX))
@@ -672,6 +680,24 @@ mod tests {
         // A client's codec decodes what a server sends.
         let mut buf = raw_frame(&empty_field(13));
         assert!(FrameCodec::control().decode(&mut buf).unwrap().is_some());
+    }
+
+    /// A codec whose frame limit is already under the restricted cap stays
+    /// restricted, and keeps the restricted decoded limit, when its decoded
+    /// limit is changed afterwards.
+    #[test]
+    fn a_small_restricted_codec_keeps_its_decoded_cap() {
+        let mut codec = FrameCodec::with_limit(1024).with_decoded_limit(usize::MAX);
+        codec.restrict(true);
+        assert!(codec.restricted());
+        assert_eq!(codec.decoded_limit(), crate::MAX_RESTRICTED_DECODED);
+        let codec = codec.with_decoded_limit(usize::MAX);
+        assert!(codec.restricted());
+        assert_eq!(codec.decoded_limit(), crate::MAX_RESTRICTED_DECODED);
+        let mut codec = codec;
+        codec.restrict(false);
+        assert!(!codec.restricted());
+        assert_eq!(codec.decoded_limit(), usize::MAX);
     }
 
     #[test]
