@@ -1,4 +1,4 @@
-//! The voice datagram header (docs/ARCHITECTURE.md § 6.4) byte by byte. Not
+//! The voice datagram header (docs/PROTOCOL.md § 6.4) byte by byte. Not
 //! protobuf, so `wire_surface.rs` cannot pin it: these tests do.
 
 use yapsta_proto::voice::{

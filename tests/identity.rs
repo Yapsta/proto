@@ -1,4 +1,4 @@
-//! Identity (docs/ARCHITECTURE.md § 6.2): the known-answer vectors the client
+//! Identity (docs/PROTOCOL.md § 6.2): the known-answer vectors the client
 //! and bot repos share, and every rejection the server relies on.
 
 use prost::Message;

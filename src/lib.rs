@@ -1,4 +1,4 @@
-//! Yapsta's native wire protocol (docs/ARCHITECTURE.md § 6): the messages, the
+//! Yapsta's native wire protocol (docs/PROTOCOL.md § 6): the messages, the
 //! error codes, the version constants and the frame codec. Used by the server,
 //! Yapsta Client and Yapsta Bot. No sockets and no TLS here.
 //!

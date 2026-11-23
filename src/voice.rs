@@ -1,4 +1,4 @@
-//! Voice datagrams (docs/ARCHITECTURE.md § 6.4, § 6.10): the 16-byte header in
+//! Voice datagrams (docs/PROTOCOL.md § 6.4, § 6.10): the 16-byte header in
 //! front of the Opus payload. Not protobuf: the layout is fixed byte by byte,
 //! big-endian, and pinned by `tests/voice.rs`.
 //!

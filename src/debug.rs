@@ -1,7 +1,7 @@
 //! `Debug` for the messages that carry a secret (resume tokens, redeem codes,
 //! channel passwords), user text (client info, custom status, names, profiles)
 //! or other bytes a peer fills freely (error text, signed device-list bodies,
-//! blobs): the shape and lengths only. ARCHITECTURE § 6.2
+//! blobs): the shape and lengths only. PROTOCOL § 6.2
 //! and § 6.3 say these are never logged; this keeps a stray `{:?}` from doing so.
 //!
 //! The messages are listed in `redacted_debug.txt` (read by build.rs), and

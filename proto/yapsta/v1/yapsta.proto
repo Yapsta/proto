@@ -1,4 +1,4 @@
-// Yapsta's native protocol, version 1 (docs/ARCHITECTURE.md § 6).
+// Yapsta's native protocol, version 1 (docs/PROTOCOL.md § 6).
 //
 // Stable API from M1 on (§ 6.7): fields, numbers, types and enum values are only
 // ever added. Never renumber, retype or repurpose a field; never move a field into

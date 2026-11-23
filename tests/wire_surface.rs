@@ -1,4 +1,4 @@
-//! The wire surface is add-only (docs/ARCHITECTURE.md § 6.7). The committed
+//! The wire surface is add-only (docs/PROTOCOL.md § 6.7). The committed
 //! `wire_surface.txt` lists every message field and enum value (nested ones too)
 //! with its number, type and oneof, and every reservation. A removed,
 //! renumbered, retyped or moved line fails this test, unless it was retired

@@ -1,4 +1,4 @@
-//! Identity (docs/ARCHITECTURE.md § 6.2): the seed and its recovery phrase,
+//! Identity (docs/PROTOCOL.md § 6.2): the seed and its recovery phrase,
 //! the per-instance account and device keys, device lists and the `Auth`
 //! transcript; from M8 a bot's seed, key and `Auth` transcript (§ 6.15).
 //! Clients and bots derive and sign with it; the server verifies with it.
