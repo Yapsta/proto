@@ -848,6 +848,7 @@ dependencies = [
  "hmac",
  "prost",
  "prost-build",
+ "prost-types",
  "protox",
  "sha2",
  "thiserror",

@@ -1,15 +1,16 @@
 //! The frame decoder (§ 6.1) fed a byte stream in chunks, in each of the
 //! codec's modes. Never panics; a frame is never bigger than the limit it was
 //! decoded under; a server reading a client never gets a server-only body;
-//! the buffer grows with the bytes received, not with a claimed length; every
-//! decoded envelope re-encodes and decodes to itself.
+//! the buffer grows with the bytes received, not with a claimed length; a
+//! decoded frame's bound is within the codec's decoded limit; every decoded
+//! envelope re-encodes and decodes to itself.
 #![no_main]
 
 use bytes::BytesMut;
 use libfuzzer_sys::fuzz_target;
 use prost::Message;
 use tokio_util::codec::{Decoder, Encoder};
-use yapsta_proto::frame::{FrameCodec, FrameError, SERVER_ONLY_BODIES};
+use yapsta_proto::frame::{FrameCodec, FrameError, SERVER_ONLY_BODIES, decoded_bound};
 use yapsta_proto::v1::{Envelope, envelope::Body};
 use yapsta_proto::{MAX_CONTROL_FRAME, MAX_RESTRICTED_FRAME};
 
@@ -82,6 +83,9 @@ fuzz_target!(|data: &[u8]| {
                             "a server-only body got through"
                         );
                     }
+                    let bound = decoded_bound(&env.encode_to_vec())
+                        .expect("a decoded envelope has a bound");
+                    assert!(bound <= codec.decoded_limit(), "decoded past the bound");
                     let again = Envelope::decode(env.encode_to_vec().as_slice())
                         .expect("a decoded envelope re-encodes");
                     assert_eq!(again, env, "round trip");
@@ -92,7 +96,8 @@ fuzz_target!(|data: &[u8]| {
                 }
                 Ok(None) => break,
                 Err(FrameError::TooLarge { len, max }) => {
-                    assert_eq!(max, limit);
+                    // The encoded length, or the decoded bound.
+                    assert!(max == limit || max == codec.decoded_limit());
                     assert!(len > max as u64);
                     return;
                 }
