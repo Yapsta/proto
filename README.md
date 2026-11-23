@@ -74,6 +74,11 @@ cargo test --locked
 The Rust toolchain is pinned in `rust-toolchain.toml`. CI runs the same on
 every pull request and on `main`, plus cargo-deny.
 
+Fuzz targets for the frame codec, `Envelope` decoding, the identity parsers
+and the voice header live in [`fuzz/`](fuzz/README.md), a separate cargo-fuzz
+workspace. Run one with `scripts/fuzz.sh <target> -max_total_time=300`. The
+Fuzz workflow runs them weekly and on demand, never on pull requests.
+
 ## Releasing
 
 Releases are cut from GitHub Actions only: **Actions → Release → Run
