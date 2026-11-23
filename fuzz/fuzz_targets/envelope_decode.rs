@@ -1,20 +1,25 @@
 //! `Envelope` decoding of arbitrary bytes, and what a receiver does next with
 //! one: the server-only-body pre-check, the minor classification, `Debug`
-//! (the redacting impls), error codes. Never panics; a decoded envelope
-//! round-trips; a server-only body is always caught by the pre-check.
+//! (the redacting impls), error codes, the decoded-size bound. Never panics;
+//! a decoded envelope round-trips; a server-only body is always caught by the
+//! pre-check; whatever decodes has a decoded-size bound.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
 use prost::Message;
-use yapsta_proto::frame::carries_server_body;
+use yapsta_proto::frame::{carries_server_body, decoded_bound, repeated_entries};
 use yapsta_proto::v1::{Envelope, envelope::Body};
 use yapsta_proto::{WireCode, command_kind_name, minor_of};
 
 fuzz_target!(|data: &[u8]| {
     let carries = carries_server_body(data);
+    let bound = decoded_bound(data);
+    let commands = repeated_entries(data, &[14, 63, 1]);
     let Ok(env) = Envelope::decode(data) else {
         return;
     };
+    assert!(bound.is_ok(), "decodes, but the bound walk refused it");
+    assert!(commands.is_ok(), "decodes, but the entry count refused it");
     let encoded = env.encode_to_vec();
     assert_eq!(encoded.len(), env.encoded_len());
     let again = Envelope::decode(encoded.as_slice()).expect("re-encoded envelope decodes");
