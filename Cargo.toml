@@ -32,6 +32,8 @@ zeroize = "1.9.1"
 [build-dependencies]
 prost = { version = "0.14.4", default-features = false, features = ["std", "derive"] }
 prost-build = "0.14.4"
+# The descriptor types build.rs reads to write the decoded-size table.
+prost-types = "0.14.4"
 protox = "0.10.0"
 
 [dev-dependencies]

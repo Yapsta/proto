@@ -4,6 +4,7 @@
 //!
 //! The wire surface is add-only (§ 6.7); `tests/wire_surface.rs` enforces it.
 
+mod bound;
 mod debug;
 pub mod frame;
 pub mod identity;
@@ -50,6 +51,21 @@ pub const MAX_REQUEST_FRAME: usize = 16 * 1024 * 1024;
 /// non-member session (§ 6.1, § 6.16). The largest legal `Auth` is under
 /// 18 KiB.
 pub const MAX_RESTRICTED_FRAME: usize = 32 * 1024;
+
+/// The most heap a frame on the control stream or TCP may decode to, by
+/// [`frame::decoded_bound`] (§ 6.1): 16 times [`MAX_CONTROL_FRAME`]. A frame
+/// over it is `TOO_LARGE` before it is decoded.
+pub const MAX_CONTROL_DECODED: usize = 16 * MAX_CONTROL_FRAME;
+
+/// The most heap a frame on a QUIC request stream may decode to (§ 6.1):
+/// 4 times [`MAX_REQUEST_FRAME`]. A reply that large is mostly file bytes,
+/// which decode to their own size.
+pub const MAX_REQUEST_DECODED: usize = 4 * MAX_REQUEST_FRAME;
+
+/// The most heap a frame under [`MAX_RESTRICTED_FRAME`] may decode to
+/// (§ 6.16): 8 times the frame. The largest legal `Auth` decodes to under
+/// 20 KiB.
+pub const MAX_RESTRICTED_DECODED: usize = 8 * MAX_RESTRICTED_FRAME;
 
 /// An error or close code as received. A newer peer can send codes this
 /// version does not know; those are errors, never a normal close.

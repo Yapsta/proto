@@ -1,14 +1,21 @@
 //! Frames (§ 6.1): a `u32` big-endian length, then that many bytes of
 //! [`Envelope`]. The length is checked against the stream's limit before
 //! anything is reserved or read, so a peer cannot make the receiver allocate
-//! more than the limit.
+//! more than the limit. The bytes are then walked, still undecoded, for the
+//! most heap they can decode to ([`decoded_bound`]), and that is held to the
+//! stream's decoded limit: the encoded length alone does not bound memory.
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use prost::Message;
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::v1::{Envelope, ErrorCode};
-use crate::{MAX_CONTROL_FRAME, MAX_REQUEST_FRAME};
+use crate::{
+    MAX_CONTROL_DECODED, MAX_CONTROL_FRAME, MAX_REQUEST_DECODED, MAX_REQUEST_FRAME,
+    MAX_RESTRICTED_DECODED,
+};
+
+pub use crate::bound::MAX_DEPTH;
 
 /// `Envelope` body fields only a server ever sends (§ 6.16): `error`,
 /// `hello`, `welcome`, `event`, `ephemeral`, `ack`, `resync`,
@@ -30,7 +37,9 @@ const RESERVE_STEP: usize = 64 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrameError {
-    /// The declared or encoded length is over the stream's limit.
+    /// The declared or encoded length is over the stream's limit, or the
+    /// frame's [`decoded_bound`] is over the stream's decoded limit (`len` is
+    /// then that bound, and `max` the decoded limit).
     #[error("a frame of {len} bytes is over the {max}-byte limit")]
     TooLarge { len: u64, max: usize },
     /// The frame's bytes are not an `Envelope`.
@@ -60,6 +69,9 @@ pub struct FrameCodec {
     /// The decoding limit: `max`, or less while a server restricts a
     /// client (§ 6.16). Encoding always uses `max`.
     max_in: usize,
+    /// The decoded limit ([`decoded_bound`]) for `max`, and for `max_in`.
+    max_decoded: usize,
+    max_decoded_in: usize,
     /// A server reading a client: frames carrying a server-only body are
     /// refused before they are decoded.
     from_client: bool,
@@ -69,26 +81,52 @@ pub struct FrameCodec {
 }
 
 impl FrameCodec {
-    /// The control stream and the TCP fallback: 1 MiB.
+    /// The control stream and the TCP fallback: 1 MiB, decoding to at most
+    /// [`MAX_CONTROL_DECODED`].
     pub fn control() -> Self {
-        Self::with_limit(MAX_CONTROL_FRAME)
+        Self::with_limit(MAX_CONTROL_FRAME).with_decoded_limit(MAX_CONTROL_DECODED)
     }
 
-    /// A QUIC request stream: 16 MiB.
+    /// A QUIC request stream: 16 MiB, decoding to at most
+    /// [`MAX_REQUEST_DECODED`].
     pub fn request() -> Self {
-        Self::with_limit(MAX_REQUEST_FRAME)
+        Self::with_limit(MAX_REQUEST_FRAME).with_decoded_limit(MAX_REQUEST_DECODED)
     }
 
     /// Frames of at most `max` bytes (the prefix not counted), capped at
-    /// `u32::MAX`, the largest length the prefix can carry.
+    /// `u32::MAX`, the largest length the prefix can carry. They decode to
+    /// at most 16 times `max` ([`decoded_bound`]) unless
+    /// [`with_decoded_limit`](Self::with_decoded_limit) says otherwise.
     pub fn with_limit(max: usize) -> Self {
         let max = max.min(u32::MAX as usize);
+        let max_decoded = max.saturating_mul(16);
         Self {
             max,
             max_in: max,
+            max_decoded,
+            max_decoded_in: max_decoded,
             from_client: false,
             refused_server_body: false,
         }
+    }
+
+    /// The same codec, refusing a frame whose [`decoded_bound`] is over
+    /// `max` bytes (and, while restricted, over the lesser of `max` and
+    /// [`MAX_RESTRICTED_DECODED`]).
+    #[must_use]
+    pub fn with_decoded_limit(self, max: usize) -> Self {
+        let mut codec = Self {
+            max_decoded: max,
+            ..self
+        };
+        codec.restrict(self.restricted());
+        codec
+    }
+
+    /// The decoded limit frames are read under now: the most heap a frame
+    /// may decode to, by [`decoded_bound`].
+    pub fn decoded_limit(&self) -> usize {
+        self.max_decoded_in
     }
 
     /// A server's control stream, reading a client: 1 MiB, and a frame
@@ -113,13 +151,17 @@ impl FrameCodec {
     }
 
     /// Restricts (or, with `false`, frees) what is decoded to
-    /// [`MAX_RESTRICTED_FRAME`]: before `Welcome` and for a non-member
+    /// [`MAX_RESTRICTED_FRAME`], decoding to at most
+    /// [`MAX_RESTRICTED_DECODED`]: before `Welcome` and for a non-member
     /// (§ 6.16). Encoding keeps the full limit.
     pub fn restrict(&mut self, restricted: bool) {
-        self.max_in = if restricted {
-            self.max.min(crate::MAX_RESTRICTED_FRAME)
+        (self.max_in, self.max_decoded_in) = if restricted {
+            (
+                self.max.min(crate::MAX_RESTRICTED_FRAME),
+                self.max_decoded.min(MAX_RESTRICTED_DECODED),
+            )
         } else {
-            self.max
+            (self.max, self.max_decoded)
         };
     }
 }
@@ -141,6 +183,44 @@ pub fn carries_server_body(mut body: &[u8]) -> bool {
         }
     }
     false
+}
+
+/// The most heap an `Envelope` decoded from `body` (an encoded `Envelope`,
+/// no length prefix) can hold, past the `Envelope` value itself, walked
+/// before decoding and without allocating. It counts each string and bytes
+/// value, and each repeated field's `Vec` at twice its entries (capacity
+/// grows by doubling) times the size of an entry, through every nested
+/// message (up to [`MAX_DEPTH`] deep). Fields this version does not know
+/// count nothing: they are skipped when decoding.
+///
+/// `INVALID` ([`FrameError::Invalid`]) for bytes that would not decode as
+/// the schema says, or that nest past [`MAX_DEPTH`].
+///
+/// [`FrameCodec`] refuses a frame over its decoded limit with this; a
+/// receiver can also charge its memory budgets by it rather than by the
+/// encoded length.
+pub fn decoded_bound(body: &[u8]) -> Result<usize, FrameError> {
+    crate::bound::decoded_bound(body)
+        .map(|n| usize::try_from(n).unwrap_or(usize::MAX))
+        .map_err(|_| FrameError::Invalid)
+}
+
+/// How many entries the field at `path` has in `body` (an encoded
+/// `Envelope`), counted before decoding, so a receiver can hold a kind's
+/// entry caps (commands per registration, options per command) before it
+/// decodes anything.
+///
+/// `path` is field numbers from `Envelope` down: every number but the last
+/// names a message field. Entries add up across occurrences of a singular
+/// message (they merge when decoded); through a repeated message the count
+/// is the most any one entry of it has. A packed run counts each value.
+///
+/// `INVALID` if `body` would not decode, or `path` does not name such a
+/// chain of fields in this version's schema.
+pub fn repeated_entries(body: &[u8], path: &[u32]) -> Result<usize, FrameError> {
+    crate::bound::repeated_entries(body, path)
+        .map(|n| usize::try_from(n).unwrap_or(usize::MAX))
+        .map_err(|_| FrameError::Invalid)
 }
 
 impl Decoder for FrameCodec {
@@ -174,6 +254,13 @@ impl Decoder for FrameCodec {
         if self.from_client && carries_server_body(&body) {
             self.refused_server_body = true;
             return Err(FrameError::Invalid);
+        }
+        let bound = decoded_bound(&body)?;
+        if bound > self.max_decoded_in {
+            return Err(FrameError::TooLarge {
+                len: bound as u64,
+                max: self.max_decoded_in,
+            });
         }
         Envelope::decode(body.freeze())
             .map(Some)

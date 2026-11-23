@@ -5,8 +5,8 @@ what a peer sends:
 
 | Target | What it feeds |
 |---|---|
-| `frame_decode` | A byte stream, in chunks, to `FrameCodec` in each mode (client control, server control, restricted, small limit, request). Checks that frames stay within their limit, that no server-only body reaches a server, that buffer growth follows the bytes received, and that frames round-trip. |
-| `envelope_decode` | `Envelope::decode` of arbitrary bytes, then `carries_server_body`, `minor_of`, the redacting `Debug` impls and the round trip. |
+| `frame_decode` | A byte stream, in chunks, to `FrameCodec` in each mode (client control, server control, restricted, small limit, request). Checks that frames stay within their limit and their decoded-size bound within the codec's decoded limit, that no server-only body reaches a server, that buffer growth follows the bytes received, and that frames round-trip. |
+| `envelope_decode` | `Envelope::decode` of arbitrary bytes, then `carries_server_body`, `decoded_bound` and `repeated_entries` (whatever decodes has a bound), `minor_of`, the redacting `Debug` impls and the round trip. |
 | `identity` | `PublicKey::from_slice`, `verify_device_list`, `ServerId::parse`, `Seed::from_phrase`, `BotSeed::from_text`, `AuthTranscript::verify`. |
 | `voice_header` | `voice::Header::parse` and `voice::forwarded`. |
 
