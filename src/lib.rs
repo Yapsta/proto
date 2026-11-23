@@ -19,6 +19,15 @@ pub mod v1 {
     include!(concat!(env!("OUT_DIR"), "/yapsta.v1.rs"));
 }
 
+/// The `.proto` source this crate compiles (`proto/yapsta/v1/yapsta.proto`),
+/// for a consumer's tests that check names against the wire definition.
+pub const PROTO_SOURCE: &str = include_str!("../proto/yapsta/v1/yapsta.proto");
+
+/// The committed wire surface (`tests/wire_surface.txt`, § 6.7): every field
+/// and enum value with its number and type, one per line, for a consumer's
+/// tests that check a message's shape.
+pub const WIRE_SURFACE: &str = include_str!("../tests/wire_surface.txt");
+
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 

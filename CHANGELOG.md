@@ -17,6 +17,8 @@ server's at the move, protocol `yapsta/1` minor 10, accepting minors 10 and 9.
 - `COMMAND_KIND_NAMES` and `command_kind_index`: an exhaustive index over the
   command kinds, for counting commands in a fixed table. Rust API only; the
   wire is unchanged.
+- `PROTO_SOURCE` and `WIRE_SURFACE`: the `.proto` source and the committed
+  wire surface as text, for consumers' tests.
 - The protocol specification, `docs/PROTOCOL.md` (§ 6.1 to § 6.18, numbered
   as before).
 
