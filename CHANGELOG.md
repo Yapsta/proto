@@ -20,7 +20,8 @@ server's at the move, protocol `yapsta/1` minor 10, accepting minors 10 and 9.
 - `PROTO_SOURCE` and `WIRE_SURFACE`: the `.proto` source and the committed
   wire surface as text, for consumers' tests.
 - The protocol specification, `docs/PROTOCOL.md` (§ 6.1 to § 6.18, numbered
-  as before).
+  as before). § 6.13, the operator's side (admin HTTP API, operator CLI), is
+  server-specific and stays in the server's documentation; § 6.13 here says so.
 
 ### Changed
 
