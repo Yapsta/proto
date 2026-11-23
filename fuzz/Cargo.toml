@@ -1,0 +1,54 @@
+# cargo-fuzz targets for yapsta-proto: the frame codec, Envelope decoding, the
+# identity parsers and the voice datagram header. Its own workspace, never a
+# member of anything else: libfuzzer-sys is built only here, never shipped.
+# Run: `scripts/fuzz.sh` (or `cargo +nightly fuzz run <target>` in this dir).
+[package]
+name = "yapsta-proto-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+bytes = "1"
+libfuzzer-sys = "0.4"
+prost = "0.14"
+tokio-util = { version = "0.7", features = ["codec"] }
+yapsta-proto = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "frame_decode"
+path = "fuzz_targets/frame_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "envelope_decode"
+path = "fuzz_targets/envelope_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "identity"
+path = "fuzz_targets/identity.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "voice_header"
+path = "fuzz_targets/voice_header.rs"
+test = false
+doc = false
+bench = false
