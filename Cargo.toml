@@ -3,7 +3,7 @@ name = "yapsta-proto"
 description = "Yapsta's native wire protocol: messages, error codes and the frame codec (docs/PROTOCOL.md)."
 # MAJOR.MINOR follows the protocol (ALPN yapsta/MAJOR, newest minor
 # MINOR_VERSION); PATCH counts every other release (README.md, Versioning).
-version = "1.11.0"
+version = "1.11.1"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
