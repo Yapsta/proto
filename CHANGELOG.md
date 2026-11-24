@@ -8,6 +8,8 @@ other release (README.md, Versioning).
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-11-24
+
 Protocol minor 11, part 2: end-to-end encrypted DMs with MLS, behind
 `Capability.MLS_DMS` (PROTOCOL.md § 6.19).
 
