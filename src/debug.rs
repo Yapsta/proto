@@ -20,9 +20,9 @@ use crate::v1::{
 };
 use crate::v1::{
     AnswerMedia, BlobData, Channel, ChannelKind, ClientInfo, CreateChannel, CreateEmoji,
-    CreateRole, CreateThread, CustomEmoji, EditMessage, EmojiRef, Error, ErrorCode, ImagePurpose,
-    InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember, PresenceStatus,
-    PresenceUpdate, Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage,
+    CreateRole, CreateThread, CustomEmoji, DmMode, EditMessage, EmojiRef, Error, ErrorCode,
+    ImagePurpose, InviteCreated, JoinPolicy, JoinVoice, Member, Message, Poke, PokeMember,
+    PresenceStatus, PresenceUpdate, Redeem, RenameEmoji, Resume, Role, SearchRequest, SendMessage,
     SetChannelPassword, SetNickname, SetPresence, SignedDeviceList, SignedUrl, Space,
     SpacePublicInfo, SpaceStyle, Thread, UpdateChannel, UpdateProfile, UpdateRole, UpdateSpace,
     UpdateThread, UploadAttachmentRequest, UploadImageRequest, UploadSlot, VoiceChatAccess,
@@ -124,6 +124,7 @@ macro_rules! redacting_debug {
     (@show $field:ident opt_hidden) => { $field.map(|_| Hidden) };
     (@show $field:ident ids) => { Ids($field.len()) };
     (@show $field:ident dm_kind) => { known::<DmKind>(*$field) };
+    (@show $field:ident dm_mode) => { known::<DmMode>(*$field) };
     (@show $field:ident notify_target) => { known::<NotifyTarget>(*$field) };
     (@show $field:ident notify_level) => { known::<NotifyLevel>(*$field) };
 }
@@ -271,6 +272,7 @@ redacting_debug!(Space {
     default_voice_channel,
     join_policy: policy,
     open_join_role_ids,
+    dm_mode: dm_mode,
 });
 redacting_debug!(Channel {
     id,
