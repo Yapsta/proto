@@ -32,15 +32,16 @@ pub const WIRE_SURFACE: &str = include_str!("../tests/wire_surface.txt");
 /// The ALPN protocol, on QUIC and on the TCP fallback (§ 6.1).
 pub const ALPN: &[u8] = b"yapsta/1";
 
-/// The newest minor version this crate defines (§ 6.7): 10 = M10. Minor
-/// versions start at 1; 0 is invalid. A client sends the minor it implements,
-/// not this constant by default: a client that speaks minor 10 must handle the
-/// M10 surface (the personal stream, § 6.3; DMs, § 6.17; push, § 6.18).
-pub const MINOR_VERSION: u32 = 10;
+/// The newest minor version this crate defines (§ 6.7): 11. Minor versions
+/// start at 1; 0 is invalid. A client sends the minor it implements, not this
+/// constant by default: a client that speaks minor 11 must handle the minor-11
+/// surface (`Space.dm_mode`, § 6.17 "DM modes") as well as minor 10's (the
+/// personal stream, § 6.3; DMs, § 6.17; push, § 6.18).
+pub const MINOR_VERSION: u32 = 11;
 
 /// The minors the server accepts, highest first: `Hello.versions` (§ 6.7).
-/// The current and the previous one; minor 8 (M8) is no longer accepted.
-pub const SUPPORTED_MINORS: &[u32] = &[10, 9];
+/// The current and the previous one; minor 9 (M9) is no longer accepted.
+pub const SUPPORTED_MINORS: &[u32] = &[11, 10];
 
 /// Largest frame on the control stream and on TCP (§ 6.1).
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;

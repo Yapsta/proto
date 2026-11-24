@@ -447,6 +447,9 @@ message Space {
   // (ascending, never @everyone).
   JoinPolicy join_policy = 13;
   repeated uint64 open_join_role_ids = 14;
+  // Minor 11 (§ 6.17, "DM modes"), in both forms. Set by the server's
+  // admin, never by a command.
+  DmMode dm_mode = 15;
 }
 
 // M5 (§ 6.11): how a space is run; clients lay themselves out by it.
@@ -462,6 +465,15 @@ enum JoinPolicy {
   JOIN_POLICY_UNSPECIFIED = 0;
   JOIN_POLICY_INVITE_ONLY = 1;
   JOIN_POLICY_OPEN = 2;
+}
+
+// Minor 11 (§ 6.17, "DM modes"): how DMs work on this server. A client
+// reads UNSPECIFIED as STORED and an unknown value as OFF.
+enum DmMode {
+  DM_MODE_UNSPECIFIED = 0;
+  DM_MODE_OFF = 1;
+  DM_MODE_LIVE = 2;
+  DM_MODE_STORED = 3;
 }
 
 // M5 (§ 6.11): who reads a voice channel's chat.

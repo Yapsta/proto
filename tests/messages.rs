@@ -1974,6 +1974,43 @@ fn m9_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// Minor 11 (§ 6.17, "DM modes"): `Space.dm_mode`, in the snapshot form and
+/// in `space_updated`.
+fn m11_examples() -> Vec<(&'static str, Envelope)> {
+    vec![
+        (
+            "m11_event_space_updated_dm_mode",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Event(Event {
+                    seq: 1100,
+                    kind: Some(event::Kind::SpaceUpdated(SpaceUpdated {
+                        space: Some(Space {
+                            dm_mode: DmMode::Off.into(),
+                            ..space()
+                        }),
+                    })),
+                })),
+            },
+        ),
+        (
+            "m11_hello",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Hello(Hello {
+                    server_id: "a5jy5opmsxgrcsn22buvxzm5qi".to_owned(),
+                    versions: vec![11, 10],
+                    challenge: vec![1; 32],
+                    capabilities: vec![],
+                    space_public_info: None,
+                })),
+            },
+        ),
+    ]
+}
+
 fn media_track() -> MediaTrack {
     MediaTrack {
         media_id: 7,
@@ -2776,6 +2813,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m8_wire_b_examples())
     .chain(m9_examples())
     .chain(m10_examples())
+    .chain(m11_examples())
     .collect()
 }
 
@@ -2874,8 +2912,8 @@ fn unknown_variants_inside_messages_decode_to_none() {
 #[test]
 fn the_constants() {
     assert_eq!(ALPN, b"yapsta/1");
-    assert_eq!(MINOR_VERSION, 10);
-    assert_eq!(SUPPORTED_MINORS, [10, 9]);
+    assert_eq!(MINOR_VERSION, 11);
+    assert_eq!(SUPPORTED_MINORS, [11, 10]);
     assert_eq!(yapsta_proto::MAX_CONTROL_FRAME, 1 << 20);
     assert_eq!(yapsta_proto::MAX_REQUEST_FRAME, 16 << 20);
 }
@@ -3839,4 +3877,49 @@ fn debug_output_hides_who_dms_and_blocks_whom() {
         }
     );
     assert!(channel_typing.contains("dm_id: None"), "{channel_typing}");
+}
+
+/// Minor 11 (§ 6.17, "DM modes"): the values are pinned, a mode prints by
+/// name, and a newer value prints as `Unknown`, never a bare number.
+#[test]
+fn dm_mode_values_are_pinned_and_named() {
+    assert_eq!(
+        [
+            DmMode::Unspecified as i32,
+            DmMode::Off as i32,
+            DmMode::Live as i32,
+            DmMode::Stored as i32,
+        ],
+        [0, 1, 2, 3]
+    );
+    let shown = format!(
+        "{:?}",
+        Space {
+            dm_mode: DmMode::Stored.into(),
+            ..Space::default()
+        }
+    );
+    assert!(shown.contains("dm_mode: Stored"), "{shown}");
+    let shown = format!(
+        "{:?}",
+        Space {
+            dm_mode: 97,
+            ..Space::default()
+        }
+    );
+    assert!(shown.contains("dm_mode: Unknown(97)"), "{shown}");
+}
+
+/// A minor-10 `Space` (no field 15) decodes as `UNSPECIFIED`, which a client
+/// reads as `STORED`; field 15 is the only new bytes.
+#[test]
+fn a_space_without_dm_mode_decodes_as_unspecified() {
+    let old = space().encode_to_vec();
+    assert_eq!(Space::decode(old.as_slice()).unwrap().dm_mode, 0);
+    let new = Space {
+        dm_mode: DmMode::Off.into(),
+        ..space()
+    }
+    .encode_to_vec();
+    assert_eq!(new, [old.as_slice(), &[0x78, 0x01]].concat());
 }
