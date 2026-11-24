@@ -130,6 +130,7 @@ impl v1::Error {
             message: message.to_owned(),
             retry_after_ms: None,
             device_list: None,
+            mls_epoch: None,
         }
     }
 }
@@ -162,12 +163,14 @@ pub fn minor_of(body: &v1::envelope::Body) -> u32 {
         // § 6.3: server-only bodies, refused from their tag before decoding
         // when a client sends one (frame.rs); classified for completeness.
         Body::Personal(_) | Body::PersonalSnapshot(_) => 10,
+        // § 6.19: server-only too.
+        Body::Mls(_) => 11,
     }
 }
 
 /// Each command kind's name for metrics labels (§ 6.13), at its
 /// [`command_kind_index`]: its field name in `Command.kind`.
-pub const COMMAND_KIND_NAMES: [&str; 85] = [
+pub const COMMAND_KIND_NAMES: [&str; 89] = [
     "get_space",
     "update_space",
     "set_space_icon",
@@ -253,6 +256,10 @@ pub const COMMAND_KIND_NAMES: [&str; 85] = [
     "register_push",
     "unregister_push",
     "go_background",
+    "reserve_dm",
+    "publish_key_packages",
+    "submit_mls_commit",
+    "ack_mls",
 ];
 
 /// A command kind's place in [`COMMAND_KIND_NAMES`]. Exhaustive, so a new
@@ -345,6 +352,10 @@ pub fn command_kind_index(kind: &v1::command::Kind) -> usize {
         Kind::RegisterPush(_) => 82,
         Kind::UnregisterPush(_) => 83,
         Kind::GoBackground(_) => 84,
+        Kind::ReserveDm(_) => 85,
+        Kind::PublishKeyPackages(_) => 86,
+        Kind::SubmitMlsCommit(_) => 87,
+        Kind::AckMls(_) => 88,
     }
 }
 
@@ -447,6 +458,11 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         | Kind::RegisterPush(_)
         | Kind::UnregisterPush(_)
         | Kind::GoBackground(_) => 10,
+        // § 6.19.
+        Kind::ReserveDm(_)
+        | Kind::PublishKeyPackages(_)
+        | Kind::SubmitMlsCommit(_)
+        | Kind::AckMls(_) => 11,
     }
 }
 
@@ -471,6 +487,8 @@ pub fn request_minor(kind: &v1::request::Kind) -> u32 {
         Kind::BotList(_) | Kind::CommandList(_) | Kind::WebhookList(_) => 8,
         // § 6.17.
         Kind::DmHistory(_) | Kind::ListDms(_) => 10,
+        // § 6.19.
+        Kind::DeviceLists(_) | Kind::ClaimKeyPackages(_) | Kind::MlsLog(_) => 11,
     }
 }
 

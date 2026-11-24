@@ -34,6 +34,10 @@ const PUBLIC_FIELDS: &[&str] = &[
     "yapsta.v1.Hello.challenge",
     "yapsta.v1.Hello.server_id",
     "yapsta.v1.SignedDeviceList.signature",
+    // The server's MLS external-sender key and its TLS-identity signature
+    // (§ 6.19), sent to every MLS client.
+    "yapsta.v1.MlsExternalSender.certificate",
+    "yapsta.v1.MlsExternalSender.key",
 ];
 
 fn enum_lines(name: &str, e: &EnumDescriptorProto, out: &mut Vec<String>) {

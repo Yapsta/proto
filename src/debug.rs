@@ -13,6 +13,10 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use crate::v1::{
+    AccountDeviceList, ClaimKeyPackagesRequest, ClaimedKeyPackage, DeviceListsRequest,
+    DmEncryption, DmMessageKind, MlsCommit, MlsEntry, PublishKeyPackages, ReserveDm, mls_entry,
+};
+use crate::v1::{
     AddDmMember, Block, BlockUpdated, CreateGroupDm, Dm, DmKind, DmReactionAdded,
     DmReactionRemoved, EditDmMessage, NotificationSetting, NotifyLevel, NotifyTarget, OpenDm,
     PersonalSnapshot, RelayTarget, RemoveDmMember, SendDmMessage, StartTyping, Typing, Unblock,
@@ -125,6 +129,8 @@ macro_rules! redacting_debug {
     (@show $field:ident ids) => { Ids($field.len()) };
     (@show $field:ident dm_kind) => { known::<DmKind>(*$field) };
     (@show $field:ident dm_mode) => { known::<DmMode>(*$field) };
+    (@show $field:ident dm_encryption) => { known::<DmEncryption>(*$field) };
+    (@show $field:ident dm_message_kind) => { known::<DmMessageKind>(*$field) };
     (@show $field:ident notify_target) => { known::<NotifyTarget>(*$field) };
     (@show $field:ident notify_level) => { known::<NotifyLevel>(*$field) };
 }
@@ -138,12 +144,14 @@ impl fmt::Debug for Error {
             message,
             retry_after_ms,
             device_list,
+            mls_epoch,
         } = self;
         f.debug_struct("Error")
             .field("code", &known::<ErrorCode>(*code))
             .field("message", &Redacted(message.len()))
             .field("retry_after_ms", retry_after_ms)
             .field("device_list", device_list)
+            .field("mls_epoch", mls_epoch)
             .finish()
     }
 }
@@ -183,6 +191,7 @@ impl fmt::Debug for Welcome {
             device_list,
             state,
             push_info,
+            mls_external_sender,
         } = self;
         f.debug_struct("Welcome")
             .field("session_id", session_id)
@@ -192,6 +201,7 @@ impl fmt::Debug for Welcome {
             .field("device_list", device_list)
             .field("state", state)
             .field("push_info", push_info)
+            .field("mls_external_sender", mls_external_sender)
             .finish()
     }
 }
@@ -431,6 +441,9 @@ redacting_debug!(Message {
     webhook_id,
     webhook_name: opt_text,
     dm_id: opt_hidden,
+    ciphertext: text,
+    dm_kind: dm_message_kind,
+    mls_epoch,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -480,10 +493,15 @@ redacting_debug!(Dm {
     name: text,
     owner_id: hidden,
     created_at,
+    encryption: dm_encryption,
+    successor_dm_id,
+    mls_group_id: text,
 });
 redacting_debug!(CreateGroupDm {
     account_ids: ids,
     name: opt_text,
+    reserved_dm_id,
+    commit,
 });
 redacting_debug!(UpdateDm { dm_id, name: text });
 redacting_debug!(SendDmMessage {
@@ -491,6 +509,9 @@ redacting_debug!(SendDmMessage {
     content: text,
     reply_to,
     attachment_ids,
+    ciphertext: text,
+    kind: dm_message_kind,
+    delete_id,
 });
 redacting_debug!(EditDmMessage {
     dm_id,
@@ -520,11 +541,65 @@ redacting_debug!(WebPushTarget {
     auth: text,
 });
 redacting_debug!(RelayTarget { token: text });
-redacting_debug!(OpenDm { account_id: hidden });
+redacting_debug!(OpenDm {
+    account_id: hidden,
+    reserved_dm_id,
+    commit,
+});
 redacting_debug!(AddDmMember {
     dm_id,
     account_id: hidden,
+    commit,
 });
+// Minor 11 (§ 6.19): MLS message bytes, KeyPackages, and the targets of
+// device-list lookups and claims never reach a log.
+redacting_debug!(MlsCommit {
+    epoch,
+    commit: text,
+    proposals: texts,
+    welcome: opt_text,
+    group_context: text,
+});
+redacting_debug!(ReserveDm {
+    kind: dm_kind,
+    account_ids: ids,
+});
+redacting_debug!(PublishKeyPackages {
+    key_packages: texts,
+    last_resort: opt_text,
+});
+redacting_debug!(DeviceListsRequest { account_ids: ids });
+redacting_debug!(AccountDeviceList {
+    account_id: hidden,
+    account_pub,
+    device_list,
+});
+redacting_debug!(ClaimKeyPackagesRequest { account_id: hidden });
+redacting_debug!(ClaimedKeyPackage {
+    device_pub,
+    key_package: text,
+    last_resort,
+});
+redacting_debug!(MlsEntry {
+    dm_id,
+    position,
+    epoch,
+    entry,
+});
+
+impl fmt::Debug for mls_entry::Entry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Handshake(b) => f
+                .debug_tuple("Handshake")
+                .field(&Redacted(b.len()))
+                .finish(),
+            Self::Message(m) => f.debug_tuple("Message").field(m).finish(),
+            Self::Welcome(b) => f.debug_tuple("Welcome").field(&Redacted(b.len())).finish(),
+            Self::UpdateRequested(_) => f.write_str("UpdateRequested"),
+        }
+    }
+}
 redacting_debug!(RemoveDmMember {
     dm_id,
     account_id: hidden,

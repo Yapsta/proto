@@ -6,6 +6,26 @@ Notable changes to `yapsta-proto`. The format follows
 the newest protocol minor this crate defines (`MINOR_VERSION`) and PATCH every
 other release (README.md, Versioning).
 
+## [Unreleased]
+
+Protocol minor 11, part 2: end-to-end encrypted DMs with MLS, behind
+`Capability.MLS_DMS` (PROTOCOL.md § 6.19).
+
+### Added
+
+- `CAPABILITY_MLS_DMS = 2`; commands `reserve_dm` (86),
+  `publish_key_packages` (87), `submit_mls_commit` (88) and `ack_mls` (89); requests
+  `device_lists` (21), `claim_key_packages` (22) and `mls_log` (23) with
+  their responses (15–17); the server-only `Envelope.body` `mls`
+  (`MlsDelivery`, 21).
+- `DmEncryption`, `DmMessageKind`, `MlsCommit`, `MlsEntry`,
+  `MlsExternalSender` and the KeyPackage and device-list messages.
+- Fields: `Dm` 7–9 (`encryption`, `successor_dm_id`, `mls_group_id`),
+  `Message` 17–19, `SendDmMessage` 5–7, `OpenDm` 2–3, `CreateGroupDm` 3–4,
+  `AddDmMember` 3, `Error.mls_epoch` (5), `Welcome.mls_external_sender` (9).
+- Redacting `Debug` for every new message with MLS bytes or a lookup
+  target; golden examples and minor checks for every new kind.
+
 ## [1.11.0] - 2026-11-24
 
 Protocol minor 11, part 1: DM modes. A server built on this release sends
