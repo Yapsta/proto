@@ -12,6 +12,7 @@ enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_CREATE = 30
 enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_DELETE = 33
 enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_MOVE = 32
 enum yapsta.v1.AuditAction.AUDIT_ACTION_CHANNEL_UPDATE = 31
+enum yapsta.v1.AuditAction.AUDIT_ACTION_DM_MODE_CHANGED = 38
 enum yapsta.v1.AuditAction.AUDIT_ACTION_ERASE = 9
 enum yapsta.v1.AuditAction.AUDIT_ACTION_EXPORT = 8
 enum yapsta.v1.AuditAction.AUDIT_ACTION_INVITE_CREATE = 34
