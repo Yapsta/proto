@@ -49,6 +49,11 @@ message Envelope {
     // from the tag (§ 6.16).
     PersonalEvent personal = 19;
     PersonalSnapshot personal_snapshot = 20;
+    // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19): MLS handshakes, messages
+    // and Welcomes for this device, and live DMs; never sequenced. Sent only
+    // by a server, only to such sessions; a client that sends one is refused
+    // from the tag (§ 6.16).
+    MlsDelivery mls = 21;
   }
 }
 
@@ -85,6 +90,9 @@ message Error {
   // whose entry expired in a newer list) can merge it and sign the next
   // version.
   optional SignedDeviceList device_list = 4;
+  // Minor 11 (§ 6.19): with CONFLICT for an MLS commit only, the group's
+  // current epoch.
+  optional uint64 mls_epoch = 5;
 }
 
 // Optional features; on only when both sides list them (§ 6.2). M1 defines none.
@@ -92,6 +100,8 @@ enum Capability {
   CAPABILITY_UNSPECIFIED = 0;
   // M10 (§ 6.18): the server lists it only while push is on.
   CAPABILITY_PUSH = 1;
+  // Minor 11 (§ 6.19): end-to-end encrypted DMs (MLS).
+  CAPABILITY_MLS_DMS = 2;
 }
 
 // Handshake (§ 6.2).
@@ -188,6 +198,9 @@ message Welcome {
   }
   // M10 (§ 6.18): a member session that negotiated PUSH.
   optional PushInfo push_info = 8;
+  // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19): the server's MLS external
+  // sender, certified by its TLS identity.
+  optional MlsExternalSender mls_external_sender = 9;
 }
 
 // Device lists (§ 6.2). `body` is the encoded DeviceListBody exactly as signed;
@@ -731,6 +744,11 @@ message Command {
     RegisterPush register_push = 83;
     UnregisterPush unregister_push = 84;
     GoBackground go_background = 85;
+    // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19).
+    ReserveDm reserve_dm = 86;
+    PublishKeyPackages publish_key_packages = 87;
+    SubmitMlsCommit submit_mls_commit = 88;
+    AckMls ack_mls = 89;
   }
 }
 
@@ -967,6 +985,10 @@ message Request {
     // M10 (§ 6.17).
     DmHistoryRequest dm_history = 19;
     ListDmsRequest list_dms = 20;
+    // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19).
+    DeviceListsRequest device_lists = 21;
+    ClaimKeyPackagesRequest claim_key_packages = 22;
+    MlsLogRequest mls_log = 23;
   }
 }
 
@@ -1015,6 +1037,10 @@ message Response {
     WebhookList webhook_list = 13;
     // M10 (§ 6.17).
     DmList dms = 14;
+    // Minor 11 (§ 6.19).
+    DeviceLists device_lists = 15;
+    ClaimedKeyPackages key_packages = 16;
+    MlsLog mls_log = 17;
   }
 }
 
@@ -1063,6 +1089,11 @@ message Message {
   // are their own id space: key a DM message by (dm_id, id). Such a Message
   // travels only in personal events and DM responses, never in an Event.
   optional uint64 dm_id = 16;
+  // Minor 11 (§ 6.19), an MLS DM's message: the ciphertext (content empty),
+  // its clear kind and the epoch it was sent in.
+  bytes ciphertext = 17;
+  DmMessageKind dm_kind = 18;
+  uint64 mls_epoch = 19;
 }
 
 message Mentions {
@@ -1875,6 +1906,14 @@ message Dm {
   // GROUP only.
   uint64 owner_id = 5;
   uint64 created_at = 6;
+  // Minor 11 (§ 6.19). UNSPECIFIED: a plaintext DM (§ 6.17), frozen from
+  // minor 11 on.
+  DmEncryption encryption = 7;
+  // On a plaintext 1:1 that has an encrypted successor: its id.
+  optional uint64 successor_dm_id = 8;
+  // An MLS DM's group id (random, chosen by its creator's client); empty
+  // until its first commit is accepted.
+  bytes mls_group_id = 9;
 }
 
 // One DM's read state for one account; last_message_id is the newest message
@@ -1894,17 +1933,32 @@ message DmList {
 
 message OpenDm {
   uint64 account_id = 1;
+  // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19): the MLS commit that adds the
+  // new account's devices, accepted in the same step as the membership.
+  // For a new MLS DM: the id `reserve_dm` gave, which its group context
+  // binds.
+  optional uint64 reserved_dm_id = 2;
+  optional MlsCommit commit = 3;
 }
 
 message CreateGroupDm {
   // 1 to 9: the others.
   repeated uint64 account_ids = 1;
   optional string name = 2;
+  // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19): the MLS commit that adds the
+  // new account's devices, accepted in the same step as the membership.
+  // For a new MLS DM: the id `reserve_dm` gave, which its group context
+  // binds.
+  optional uint64 reserved_dm_id = 3;
+  optional MlsCommit commit = 4;
 }
 
 message AddDmMember {
   uint64 dm_id = 1;
   uint64 account_id = 2;
+  // Minor 11 with CAPABILITY_MLS_DMS (§ 6.19): the MLS commit that adds the
+  // new account's devices, accepted in the same step as the membership.
+  optional MlsCommit commit = 3;
 }
 
 message RemoveDmMember {
@@ -1926,6 +1980,12 @@ message SendDmMessage {
   string content = 2;
   optional uint64 reply_to = 3;
   repeated uint64 attachment_ids = 4;
+  // Minor 11 (§ 6.19): an MLS DM's message is an MLS PrivateMessage, padded
+  // by the sender to a multiple of 256 bytes, with `content` empty.
+  bytes ciphertext = 5;
+  DmMessageKind kind = 6;
+  // With kind DELETE: the server's id of the message it deletes.
+  optional uint64 delete_id = 7;
 }
 
 message EditDmMessage {
@@ -2110,4 +2170,149 @@ message PushInfo {
   bool relay = 2;
   // Whether this device has a registration.
   bool registered = 3;
+}
+
+// Minor 11 (§ 6.19): end-to-end encrypted DMs with MLS (RFC 9420,
+// ciphersuite 0x0001). Everything here needs CAPABILITY_MLS_DMS on both
+// sides.
+
+enum DmEncryption {
+  // A plaintext DM (§ 6.17).
+  DM_ENCRYPTION_UNSPECIFIED = 0;
+  DM_ENCRYPTION_MLS = 1;
+}
+
+// An MLS DM message's clear kind (§ 6.19); a client skips an unknown one.
+enum DmMessageKind {
+  DM_MESSAGE_KIND_UNSPECIFIED = 0;
+  DM_MESSAGE_KIND_MESSAGE = 1;
+  DM_MESSAGE_KIND_EDIT = 2;
+  DM_MESSAGE_KIND_DELETE = 3;
+  DM_MESSAGE_KIND_REACTION = 4;
+}
+
+// The server as MLS external sender (§ 6.19): its Ed25519 key, and the
+// server's TLS identity's signature over
+// "yapsta/mls-external-sender/v1" 0x00 || server_id || key.
+message MlsExternalSender {
+  bytes key = 1;
+  bytes certificate = 2;
+}
+
+// An MLS commit and what it needs (§ 6.19), each an MLS message in its
+// TLS encoding: the commit (a PublicMessage) for `epoch`, the proposals it
+// refers to by reference (PublicMessages), and the Welcome for the devices
+// it adds.
+message MlsCommit {
+  uint64 epoch = 1;
+  bytes commit = 2;
+  repeated bytes proposals = 3;
+  optional bytes welcome = 4;
+  // The GroupContext (TLS-encoded) of `epoch`, which the commit's signature
+  // covers: the server checks the signature, the binding and the external
+  // senders against it.
+  bytes group_context = 5;
+}
+
+// 86: a DM id for a new MLS DM, reserved for this account for 10 minutes,
+// so its group context can bind it before the first commit.
+message ReserveDm {
+  DmKind kind = 1;
+  // The accounts the DM is for (1 for a 1:1, 1 to 9 for a group): the
+  // reservation lets the caller look up and claim their keys, and binds the
+  // `open_dm` or `create_group_dm` that uses it.
+  repeated uint64 account_ids = 2;
+}
+
+// 87: this device's KeyPackages (TLS-encoded): up to 100 one-time ones,
+// added to those it has, and the last-resort one, which replaces it.
+message PublishKeyPackages {
+  repeated bytes key_packages = 1;
+  optional bytes last_resort = 2;
+}
+
+// 88: a commit to an existing MLS DM's group (§ 6.19).
+message SubmitMlsCommit {
+  uint64 dm_id = 1;
+  MlsCommit commit = 2;
+}
+
+// 89: this device has processed an MLS DM's log up to `position`
+// (§ 6.19), whether it came by `mls` body or by `mls_log`.
+message AckMls {
+  uint64 dm_id = 1;
+  uint64 position = 2;
+}
+
+// Request 21: the signed device lists of up to 10 accounts the caller
+// shares a DM with, or is opening one with.
+message DeviceListsRequest {
+  repeated uint64 account_ids = 1;
+}
+
+message AccountDeviceList {
+  uint64 account_id = 1;
+  bytes account_pub = 2;
+  SignedDeviceList device_list = 3;
+}
+
+message DeviceLists {
+  repeated AccountDeviceList lists = 1;
+}
+
+// Request 22: one KeyPackage for each current device of an account.
+message ClaimKeyPackagesRequest {
+  uint64 account_id = 1;
+}
+
+message ClaimedKeyPackage {
+  bytes device_pub = 1;
+  bytes key_package = 2;
+  // The device's last-resort package: it had no one-time one left.
+  bool last_resort = 3;
+}
+
+message ClaimedKeyPackages {
+  repeated ClaimedKeyPackage key_packages = 1;
+}
+
+// Request 23: an MLS DM's log for this device, after `after_position`, in
+// commit order; asking past a position acknowledges what came before it, as
+// `ack_mls` does.
+message MlsLogRequest {
+  uint64 dm_id = 1;
+  uint64 after_position = 2;
+  // 1 to 100.
+  uint32 limit = 3;
+}
+
+message MlsLog {
+  repeated MlsEntry entries = 1;
+  bool has_more = 2;
+}
+
+// One entry of an MLS DM's log for one device (§ 6.19).
+message MlsEntry {
+  uint64 dm_id = 1;
+  // Its place in the group's log; 0 for a live DM, which is never stored.
+  uint64 position = 2;
+  uint64 epoch = 3;
+  oneof entry {
+    // A commit or proposal (PublicMessage), the server's own included.
+    bytes handshake = 4;
+    // An application message (`Message` with `ciphertext`).
+    Message message = 5;
+    // A Welcome for this device, after its commit was accepted.
+    bytes welcome = 6;
+    // One of the group's devices is behind: a member should commit an
+    // empty Update (§ 6.19, the ratchet window).
+    MlsUpdateRequested update_requested = 7;
+  }
+}
+
+message MlsUpdateRequested {}
+
+// Envelope body 21 (§ 6.19).
+message MlsDelivery {
+  repeated MlsEntry entries = 1;
 }

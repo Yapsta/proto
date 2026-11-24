@@ -1,3 +1,4 @@
+yapsta.v1.AccountDeviceList
 yapsta.v1.AddDmMember
 yapsta.v1.AnswerMedia
 yapsta.v1.BlobData
@@ -7,6 +8,8 @@ yapsta.v1.Bot
 yapsta.v1.BotCreated
 yapsta.v1.BotCredential
 yapsta.v1.Channel
+yapsta.v1.ClaimKeyPackagesRequest
+yapsta.v1.ClaimedKeyPackage
 yapsta.v1.ClientInfo
 yapsta.v1.CommandOption
 yapsta.v1.CommandOptionValue
@@ -18,6 +21,7 @@ yapsta.v1.CreateRole
 yapsta.v1.CreateThread
 yapsta.v1.CreateWebhook
 yapsta.v1.CustomEmoji
+yapsta.v1.DeviceListsRequest
 yapsta.v1.Dm
 yapsta.v1.DmReactionAdded
 yapsta.v1.DmReactionRemoved
@@ -33,17 +37,21 @@ yapsta.v1.MediaOffer
 yapsta.v1.MediaPublished
 yapsta.v1.Member
 yapsta.v1.Message
+yapsta.v1.MlsCommit
+yapsta.v1.MlsEntry
 yapsta.v1.NotificationSetting
 yapsta.v1.OpenDm
 yapsta.v1.PersonalSnapshot
 yapsta.v1.Poke
 yapsta.v1.PokeMember
 yapsta.v1.PresenceUpdate
+yapsta.v1.PublishKeyPackages
 yapsta.v1.PublishMedia
 yapsta.v1.Redeem
 yapsta.v1.RelayTarget
 yapsta.v1.RemoveDmMember
 yapsta.v1.RenameEmoji
+yapsta.v1.ReserveDm
 yapsta.v1.Resume
 yapsta.v1.Role
 yapsta.v1.SearchRequest

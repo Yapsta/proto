@@ -105,6 +105,9 @@ const M3_SECRETS: &[&str] = &[
 
 fn message() -> yapsta_proto::v1::Message {
     yapsta_proto::v1::Message {
+        ciphertext: vec![],
+        dm_kind: 0,
+        mls_epoch: 0,
         dm_id: None,
         id: 70,
         channel_id: 5,
@@ -700,6 +703,7 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Welcome(Welcome {
+                    mls_external_sender: None,
                     push_info: None,
                     session_id: 13,
                     account_id: Some(42),
@@ -1481,6 +1485,9 @@ fn m10_personal(seq: u64, kind: personal_event::Kind) -> Envelope {
 fn m10_examples() -> Vec<(&'static str, Envelope)> {
     use command::Kind as C;
     let dm_message = yapsta_proto::v1::Message {
+        ciphertext: vec![],
+        dm_kind: 0,
+        mls_epoch: 0,
         id: 181,
         channel_id: 0,
         thread_id: None,
@@ -1499,6 +1506,9 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
         dm_id: Some(180),
     };
     let group = Dm {
+        encryption: 0,
+        successor_dm_id: None,
+        mls_group_id: vec![],
         id: 180,
         kind: DmKind::Group.into(),
         member_ids: vec![170, 171, 172],
@@ -1524,13 +1534,22 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
     vec![
         (
             "m10_open_dm",
-            m10_command(170, C::OpenDm(OpenDm { account_id: 171 })),
+            m10_command(
+                170,
+                C::OpenDm(OpenDm {
+                    reserved_dm_id: None,
+                    commit: None,
+                    account_id: 171,
+                }),
+            ),
         ),
         (
             "m10_create_group_dm",
             m10_command(
                 171,
                 C::CreateGroupDm(CreateGroupDm {
+                    reserved_dm_id: None,
+                    commit: None,
                     account_ids: vec![171, 172],
                     name: Some("m10-group-name".to_owned()),
                 }),
@@ -1541,6 +1560,7 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
             m10_command(
                 172,
                 C::AddDmMember(AddDmMember {
+                    commit: None,
                     dm_id: 180,
                     account_id: 173,
                 }),
@@ -1575,6 +1595,9 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
             m10_command(
                 176,
                 C::SendDmMessage(SendDmMessage {
+                    ciphertext: vec![],
+                    kind: 0,
+                    delete_id: None,
                     dm_id: 180,
                     content: "m10-dm-secret-text".to_owned(),
                     reply_to: Some(181),
@@ -1783,6 +1806,7 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
                 request_id: 0,
                 last: false,
                 body: Some(Body::Welcome(Welcome {
+                    mls_external_sender: None,
                     session_id: 191,
                     account_id: Some(170),
                     membership: None,
@@ -2005,6 +2029,302 @@ fn m11_examples() -> Vec<(&'static str, Envelope)> {
                     challenge: vec![1; 32],
                     capabilities: vec![],
                     space_public_info: None,
+                })),
+            },
+        ),
+    ]
+}
+
+/// Minor 11 (§ 6.19) MLS bytes planted in the examples, each a run of one
+/// byte value so the Debug test can look for it: none may show.
+const MLS_SECRET_BYTE: u8 = 0xe7;
+
+fn mls_bytes(len: usize) -> Vec<u8> {
+    vec![MLS_SECRET_BYTE; len]
+}
+
+fn mls_commit() -> MlsCommit {
+    MlsCommit {
+        epoch: 4,
+        commit: mls_bytes(40),
+        proposals: vec![mls_bytes(20)],
+        welcome: Some(mls_bytes(30)),
+        group_context: mls_bytes(50),
+    }
+}
+
+fn mls_message() -> yapsta_proto::v1::Message {
+    yapsta_proto::v1::Message {
+        id: 9,
+        author_id: 3,
+        created_at: 1_800_000_000,
+        dm_id: Some(5),
+        ciphertext: mls_bytes(256),
+        dm_kind: DmMessageKind::Message.into(),
+        mls_epoch: 4,
+        ..Default::default()
+    }
+}
+
+/// Minor 11 (§ 6.19): every MLS command, request, response and body, and
+/// the fields minor 11 adds to older messages.
+fn m11_mls_examples() -> Vec<(&'static str, Envelope)> {
+    let cmd = |request_id, kind| Envelope {
+        request_id,
+        last: false,
+        body: Some(Body::Command(Command { kind: Some(kind) })),
+    };
+    let req = |request_id, kind| Envelope {
+        request_id,
+        last: false,
+        body: Some(Body::Request(Request { kind: Some(kind) })),
+    };
+    let resp = |request_id, kind| Envelope {
+        request_id,
+        last: true,
+        body: Some(Body::Response(Response { kind: Some(kind) })),
+    };
+    let entry = |position, entry| MlsEntry {
+        dm_id: 5,
+        position,
+        epoch: 4,
+        entry: Some(entry),
+    };
+    vec![
+        (
+            "m11_reserve_dm",
+            cmd(
+                200,
+                command::Kind::ReserveDm(ReserveDm {
+                    kind: DmKind::Group.into(),
+                    account_ids: vec![7, 8],
+                }),
+            ),
+        ),
+        (
+            "m11_publish_key_packages",
+            cmd(
+                201,
+                command::Kind::PublishKeyPackages(PublishKeyPackages {
+                    key_packages: vec![mls_bytes(64), mls_bytes(64)],
+                    last_resort: Some(mls_bytes(64)),
+                }),
+            ),
+        ),
+        (
+            "m11_submit_mls_commit",
+            cmd(
+                202,
+                command::Kind::SubmitMlsCommit(SubmitMlsCommit {
+                    dm_id: 5,
+                    commit: Some(mls_commit()),
+                }),
+            ),
+        ),
+        (
+            "m11_open_dm_with_commit",
+            cmd(
+                203,
+                command::Kind::OpenDm(OpenDm {
+                    account_id: 7,
+                    reserved_dm_id: Some(5),
+                    commit: Some(MlsCommit {
+                        epoch: 0,
+                        ..mls_commit()
+                    }),
+                }),
+            ),
+        ),
+        (
+            "m11_create_group_dm_with_commit",
+            cmd(
+                204,
+                command::Kind::CreateGroupDm(CreateGroupDm {
+                    account_ids: vec![7, 8],
+                    name: None,
+                    reserved_dm_id: Some(6),
+                    commit: Some(mls_commit()),
+                }),
+            ),
+        ),
+        (
+            "m11_add_dm_member_with_commit",
+            cmd(
+                205,
+                command::Kind::AddDmMember(AddDmMember {
+                    dm_id: 6,
+                    account_id: 9,
+                    commit: Some(mls_commit()),
+                }),
+            ),
+        ),
+        (
+            "m11_send_dm_ciphertext",
+            cmd(
+                206,
+                command::Kind::SendDmMessage(SendDmMessage {
+                    dm_id: 5,
+                    content: String::new(),
+                    reply_to: None,
+                    attachment_ids: vec![],
+                    ciphertext: mls_bytes(256),
+                    kind: DmMessageKind::Delete.into(),
+                    delete_id: Some(9),
+                }),
+            ),
+        ),
+        (
+            "m11_ack_mls",
+            cmd(
+                210,
+                command::Kind::AckMls(AckMls {
+                    dm_id: 5,
+                    position: 16,
+                }),
+            ),
+        ),
+        (
+            "m11_device_lists_request",
+            req(
+                207,
+                request::Kind::DeviceLists(DeviceListsRequest {
+                    account_ids: vec![7, 8],
+                }),
+            ),
+        ),
+        (
+            "m11_claim_key_packages_request",
+            req(
+                208,
+                request::Kind::ClaimKeyPackages(ClaimKeyPackagesRequest { account_id: 7 }),
+            ),
+        ),
+        (
+            "m11_mls_log_request",
+            req(
+                209,
+                request::Kind::MlsLog(MlsLogRequest {
+                    dm_id: 5,
+                    after_position: 12,
+                    limit: 100,
+                }),
+            ),
+        ),
+        (
+            "m11_device_lists",
+            resp(
+                207,
+                response::Kind::DeviceLists(DeviceLists {
+                    lists: vec![AccountDeviceList {
+                        account_id: 7,
+                        account_pub: vec![7; 32],
+                        device_list: Some(device_list()),
+                    }],
+                }),
+            ),
+        ),
+        (
+            "m11_key_packages",
+            resp(
+                208,
+                response::Kind::KeyPackages(ClaimedKeyPackages {
+                    key_packages: vec![ClaimedKeyPackage {
+                        device_pub: vec![8; 32],
+                        key_package: mls_bytes(64),
+                        last_resort: true,
+                    }],
+                }),
+            ),
+        ),
+        (
+            "m11_mls_log",
+            resp(
+                209,
+                response::Kind::MlsLog(MlsLog {
+                    entries: vec![
+                        entry(13, mls_entry::Entry::Handshake(mls_bytes(40))),
+                        entry(14, mls_entry::Entry::Message(mls_message())),
+                    ],
+                    has_more: true,
+                }),
+            ),
+        ),
+        (
+            "m11_mls_delivery",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Mls(MlsDelivery {
+                    entries: vec![
+                        entry(15, mls_entry::Entry::Welcome(mls_bytes(30))),
+                        entry(16, mls_entry::Entry::UpdateRequested(MlsUpdateRequested {})),
+                        entry(0, mls_entry::Entry::Message(mls_message())),
+                    ],
+                })),
+            },
+        ),
+        (
+            "m11_mls_conflict",
+            Envelope {
+                request_id: 202,
+                last: true,
+                body: Some(Body::Error(Error {
+                    mls_epoch: Some(5),
+                    ..Error::new(ErrorCode::Conflict, "not the current epoch")
+                })),
+            },
+        ),
+        (
+            "m11_welcome_external_sender",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Welcome(Welcome {
+                    mls_external_sender: Some(MlsExternalSender {
+                        key: vec![0x41; 32],
+                        certificate: vec![0x42; 64],
+                    }),
+                    ..Welcome::default()
+                })),
+            },
+        ),
+        (
+            "m11_personal_mls_dm",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Personal(PersonalEvent {
+                    seq: 12,
+                    kind: Some(personal_event::Kind::DmUpdated(DmUpdated {
+                        dm: Some(Dm {
+                            id: 5,
+                            kind: DmKind::OneToOne.into(),
+                            member_ids: vec![3, 7],
+                            created_at: 1_800_000_000,
+                            encryption: DmEncryption::Mls.into(),
+                            mls_group_id: mls_bytes(16),
+                            ..Dm::default()
+                        }),
+                    })),
+                })),
+            },
+        ),
+        (
+            "m11_personal_plaintext_successor",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Personal(PersonalEvent {
+                    seq: 13,
+                    kind: Some(personal_event::Kind::DmUpdated(DmUpdated {
+                        dm: Some(Dm {
+                            id: 4,
+                            kind: DmKind::OneToOne.into(),
+                            member_ids: vec![3, 7],
+                            successor_dm_id: Some(5),
+                            ..Dm::default()
+                        }),
+                    })),
                 })),
             },
         ),
@@ -2472,6 +2792,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Welcome(Welcome {
+                    mls_external_sender: None,
                     push_info: None,
                     session_id: 11,
                     account_id: Some(42),
@@ -2493,6 +2814,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
                 0,
                 false,
                 Body::Welcome(Welcome {
+                    mls_external_sender: None,
                     push_info: None,
                     session_id: 12,
                     account_id: None,
@@ -2814,6 +3136,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m9_examples())
     .chain(m10_examples())
     .chain(m11_examples())
+    .chain(m11_mls_examples())
     .collect()
 }
 
@@ -2963,6 +3286,7 @@ fn debug_output_redacts_peer_filled_fields_after_decoding() {
             request_id: 1,
             last: true,
             body: Some(Body::Error(Error {
+                mls_epoch: None,
                 code: 99,
                 message: "peer-secret".to_owned(),
                 retry_after_ms: Some(1500),
@@ -3006,6 +3330,7 @@ fn debug_output_redacts_peer_filled_fields_after_decoding() {
     let known = format!("{:?}", Error::new(ErrorCode::Invalid, "x"));
     assert!(known.contains("Invalid"), "{known}");
     let newer = Error {
+        mls_epoch: None,
         code: 99,
         message: String::new(),
         retry_after_ms: None,
@@ -3017,6 +3342,7 @@ fn debug_output_redacts_peer_filled_fields_after_decoding() {
 #[test]
 fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     let newer = Error {
+        mls_epoch: None,
         code: 1000,
         message: String::new(),
         retry_after_ms: None,
@@ -3030,6 +3356,7 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     assert_eq!(WireCode::of_close(1 << 32), WireCode::Unknown(1 << 32));
     assert!(!WireCode::of_close(1 << 32).is_normal_close());
     let negative = Error {
+        mls_epoch: None,
         code: -1,
         message: String::new(),
         retry_after_ms: None,
@@ -3045,6 +3372,7 @@ fn an_unknown_error_code_is_an_error_not_a_normal_close() {
     ] {
         assert_eq!(WireCode::of_close(code.close_code()), WireCode::Known(code));
         let error = Error {
+            mls_epoch: None,
             code: code.into(),
             message: String::new(),
             retry_after_ms: None,
@@ -3796,10 +4124,15 @@ fn debug_output_hides_who_dms_and_blocks_whom() {
         emoji: Some(emoji_ref::Emoji::CustomId(1)),
     });
     let values: [&dyn std::fmt::Debug; 15] = [
-        &OpenDm { account_id: WHO },
+        &OpenDm {
+            reserved_dm_id: None,
+            commit: None,
+            account_id: WHO,
+        },
         &Block { account_id: WHO },
         &Unblock { account_id: WHO },
         &AddDmMember {
+            commit: None,
             dm_id: 1,
             account_id: WHO,
         },
@@ -3830,6 +4163,9 @@ fn debug_output_hides_who_dms_and_blocks_whom() {
             muted_until: 0,
         },
         &Dm {
+            encryption: 0,
+            successor_dm_id: None,
+            mls_group_id: vec![],
             id: 1,
             kind: DmKind::Group.into(),
             member_ids: vec![WHO, WHO + 1],
@@ -3838,6 +4174,8 @@ fn debug_output_hides_who_dms_and_blocks_whom() {
             created_at: 0,
         },
         &CreateGroupDm {
+            reserved_dm_id: None,
+            commit: None,
             account_ids: vec![WHO],
             name: None,
         },
@@ -3927,4 +4265,59 @@ fn a_space_without_dm_mode_decodes_as_unspecified() {
     }
     .encode_to_vec();
     assert_eq!(new, [old.as_slice(), &[0x78, 0x01]].concat());
+}
+
+/// § 6.19: every MLS command and request kind and the `mls` body are minor
+/// 11, so a minor-10 session that sends one is refused for its version
+/// (§ 6.7); fields minor 11 adds to older kinds leave them at their minor.
+#[test]
+fn every_mls_kind_is_minor_11() {
+    use yapsta_proto::minor_of;
+    let mut kinds = 0;
+    for (name, env) in m11_mls_examples() {
+        let body = env.body.unwrap();
+        let expected = match (&body, name) {
+            (Body::Command(_), "m11_open_dm_with_commit")
+            | (Body::Command(_), "m11_create_group_dm_with_commit")
+            | (Body::Command(_), "m11_add_dm_member_with_commit")
+            | (Body::Command(_), "m11_send_dm_ciphertext")
+            | (Body::Personal(_), _) => 10,
+            (Body::Command(_) | Body::Request(_) | Body::Mls(_), _) => {
+                kinds += 1;
+                11
+            }
+            _ => continue,
+        };
+        assert_eq!(minor_of(&body), expected, "{name}");
+    }
+    assert_eq!(kinds, 4 + 3 + 1, "every MLS command, request and body");
+    assert!(
+        yapsta_proto::frame::SERVER_ONLY_BODIES.contains(&21),
+        "`mls` is a server's body"
+    );
+}
+
+/// § 6.19 "Logs": no MLS message bytes, KeyPackages, group ids, or the
+/// targets of device-list lookups and claims show in `Debug`.
+#[test]
+fn debug_output_redacts_mls_bytes_and_lookup_targets() {
+    let planted = format!("{MLS_SECRET_BYTE}");
+    for (name, env) in m11_mls_examples() {
+        let shown = format!("{env:?}");
+        assert!(!shown.contains(&planted), "{name}: {shown}");
+    }
+    let shown = format!(
+        "{:?}",
+        ClaimKeyPackagesRequest {
+            account_id: 4_242_424
+        }
+    );
+    assert!(!shown.contains("4242424"), "{shown}");
+    let shown = format!(
+        "{:?}",
+        DeviceListsRequest {
+            account_ids: vec![4_242_424]
+        }
+    );
+    assert!(!shown.contains("4242424"), "{shown}");
 }
