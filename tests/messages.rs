@@ -3685,7 +3685,8 @@ fn m9_kinds_are_minor_9_at_their_numbers() {
     );
 }
 
-/// § 6.16: the management audit actions are 22–37, in the spec's order.
+/// § 6.16: the management audit actions are 22–37, in the spec's order;
+/// minor 11 (§ 6.17) adds 38.
 #[test]
 fn m9_audit_actions_are_pinned() {
     let names = [
@@ -3710,7 +3711,11 @@ fn m9_audit_actions_are_pinned() {
         let action = AuditAction::try_from(number).unwrap();
         assert_eq!(action.as_str_name(), format!("AUDIT_ACTION_{name}"));
     }
-    assert!(AuditAction::try_from(38).is_err());
+    assert_eq!(
+        AuditAction::try_from(38).unwrap().as_str_name(),
+        "AUDIT_ACTION_DM_MODE_CHANGED"
+    );
+    assert!(AuditAction::try_from(39).is_err());
 }
 
 /// § 6.7 "Minor 10": every M10 command (68–85) and request (19–20) is minor

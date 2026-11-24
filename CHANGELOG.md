@@ -18,6 +18,8 @@ Protocol minor 11, part 1: DM modes. A server built on this release sends
   § 6.17, "DM modes"). `OFF` refuses new DM activity with `FORBIDDEN` and keeps
   history readable, leaving and deleting; `LIVE` is reserved for encrypted live DMs and is never sent
   yet.
+- `AuditAction.DM_MODE_CHANGED = 38`: the operator changed the DM mode,
+  `value` = the new `DmMode` number (PROTOCOL.md § 6.12, § 6.17).
 - Tests: a golden example per new value, the enum's numbers, its `Debug`
   names, and the encoding of a `Space` without field 15.
 
