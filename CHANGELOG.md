@@ -8,6 +8,16 @@ other release (README.md, Versioning).
 
 ## [Unreleased]
 
+### Changed
+
+- PROTOCOL.md § 6.19 "Commits": only the account a step adds (every member at
+  epoch 0) must hold a leaf after the commit, so a member whose devices all
+  lapsed no longer blocks every commit; a Remove may also name a leaf whose
+  certificate has expired; clients renew their leaf certificate in a path or
+  Update. "Adding an account": an `add_dm_member` to an MLS group that cannot
+  apply is one reason-neutral `INVALID`, never acknowledged. Documentation
+  only; no wire change.
+
 ## [1.11.1] - 2026-11-24
 
 Protocol minor 11, part 2: end-to-end encrypted DMs with MLS, behind
