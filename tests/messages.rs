@@ -108,6 +108,7 @@ fn message() -> yapsta_proto::v1::Message {
         ciphertext: vec![],
         dm_kind: 0,
         mls_epoch: 0,
+        delete_id: None,
         dm_id: None,
         id: 70,
         channel_id: 5,
@@ -1488,6 +1489,7 @@ fn m10_examples() -> Vec<(&'static str, Envelope)> {
         ciphertext: vec![],
         dm_kind: 0,
         mls_epoch: 0,
+        delete_id: None,
         id: 181,
         channel_id: 0,
         thread_id: None,
@@ -2068,6 +2070,57 @@ fn mls_message() -> yapsta_proto::v1::Message {
 
 /// Minor 11 (§ 6.19): every MLS command, request, response and body, and
 /// the fields minor 11 adds to older messages.
+/// § 6.19 "Content": a group DM's name travels as kind GROUP_NAME (5), an
+/// additive value of the minor-11 enum; its body is a `DmContent` inside
+/// the ciphertext (tests/dm_content.rs).
+fn dm_content_examples() -> Vec<(&'static str, Envelope)> {
+    vec![
+        (
+            "m11_mls_delete_with_delete_id",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Mls(MlsDelivery {
+                    entries: vec![MlsEntry {
+                        dm_id: 5,
+                        position: 17,
+                        epoch: 4,
+                        entry: Some(mls_entry::Entry::Message(yapsta_proto::v1::Message {
+                            id: 12,
+                            author_id: 9,
+                            created_at: 1_800_000_200,
+                            dm_id: Some(5),
+                            ciphertext: mls_bytes(256),
+                            dm_kind: DmMessageKind::Delete.into(),
+                            mls_epoch: 4,
+                            delete_id: Some(11),
+                            ..yapsta_proto::v1::Message::default()
+                        })),
+                    }],
+                })),
+            },
+        ),
+        (
+            "m11_send_dm_group_name",
+            Envelope {
+                request_id: 211,
+                last: false,
+                body: Some(Body::Command(Command {
+                    kind: Some(command::Kind::SendDmMessage(SendDmMessage {
+                        dm_id: 6,
+                        content: String::new(),
+                        reply_to: None,
+                        attachment_ids: vec![],
+                        ciphertext: mls_bytes(256),
+                        kind: DmMessageKind::GroupName.into(),
+                        delete_id: None,
+                    })),
+                })),
+            },
+        ),
+    ]
+}
+
 fn m11_mls_examples() -> Vec<(&'static str, Envelope)> {
     let cmd = |request_id, kind| Envelope {
         request_id,
@@ -3137,6 +3190,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m10_examples())
     .chain(m11_examples())
     .chain(m11_mls_examples())
+    .chain(dm_content_examples())
     .collect()
 }
 

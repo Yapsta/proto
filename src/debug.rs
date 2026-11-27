@@ -37,6 +37,10 @@ use crate::v1::{
     CommandOption, CommandOptionKind, CommandOptionValue, CreateWebhook, Interaction,
     InvokeCommand, SlashCommand, Webhook, WebhookCreated, command_option_value,
 };
+use crate::v1::{
+    DmContent, DmDelete, DmEdit, DmGroupName, DmReaction, DmText, EncryptedAttachment,
+    EncryptedThumbnail, dm_content,
+};
 use crate::v1::{MediaKind, MediaOffer, MediaPublished, PublishMedia, TurnCredentials};
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -444,6 +448,7 @@ redacting_debug!(Message {
     ciphertext: text,
     dm_kind: dm_message_kind,
     mls_epoch,
+    delete_id,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -600,6 +605,67 @@ impl fmt::Debug for mls_entry::Entry {
         }
     }
 }
+// § 6.19 "Content": what an MLS DM's ciphertext carries is content
+// through and through: its ids, text, keys, digests, names and types are
+// shown by length only, its mentions by count, and a file's size not at
+// all (the server sees only the padded upload).
+redacting_debug!(DmContent { id: text, body });
+
+impl fmt::Debug for dm_content::Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Text(b) => f.debug_tuple("Text").field(b).finish(),
+            Self::Edit(b) => f.debug_tuple("Edit").field(b).finish(),
+            Self::Delete(b) => f.debug_tuple("Delete").field(b).finish(),
+            Self::Reaction(b) => f.debug_tuple("Reaction").field(b).finish(),
+            Self::GroupName(b) => f.debug_tuple("GroupName").field(b).finish(),
+        }
+    }
+}
+redacting_debug!(DmText {
+    text: text,
+    reply_to: opt_text,
+    attachments,
+    mentions: ids,
+});
+redacting_debug!(DmEdit {
+    target: text,
+    text: text,
+});
+redacting_debug!(DmDelete { target: text });
+// Which emoji was reacted with is content too: its kind only.
+impl fmt::Debug for DmReaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { target, emoji, on } = self;
+        let kind = emoji.as_ref().map(|e| match e.emoji {
+            Some(emoji_ref::Emoji::Unicode(_)) => "unicode",
+            Some(emoji_ref::Emoji::CustomId(_)) => "custom",
+            None => "unknown",
+        });
+        f.debug_struct("DmReaction")
+            .field("target", &Redacted(target.len()))
+            .field("emoji", &kind)
+            .field("on", on)
+            .finish()
+    }
+}
+redacting_debug!(DmGroupName { name: text });
+redacting_debug!(EncryptedAttachment {
+    attachment_id,
+    key: text,
+    digest: text,
+    name: text,
+    mime: text,
+    size: hidden,
+    thumbnail,
+});
+redacting_debug!(EncryptedThumbnail {
+    attachment_id,
+    key: text,
+    digest: text,
+    mime: text,
+    size: hidden,
+});
 redacting_debug!(RemoveDmMember {
     dm_id,
     account_id: hidden,

@@ -1094,6 +1094,10 @@ message Message {
   bytes ciphertext = 17;
   DmMessageKind dm_kind = 18;
   uint64 mls_epoch = 19;
+  // On an MLS DM's message of kind DELETE, stored and in history: the
+  // server id of the message it dropped (its clear `delete_id`), so a
+  // receiver can check the delete's inner `target` (§ 6.19 "Content").
+  optional uint64 delete_id = 20;
 }
 
 message Mentions {
@@ -2183,12 +2187,16 @@ enum DmEncryption {
 }
 
 // An MLS DM message's clear kind (§ 6.19); a client skips an unknown one.
+// Each matches one body of the `DmContent` inside the ciphertext.
 enum DmMessageKind {
   DM_MESSAGE_KIND_UNSPECIFIED = 0;
   DM_MESSAGE_KIND_MESSAGE = 1;
   DM_MESSAGE_KIND_EDIT = 2;
   DM_MESSAGE_KIND_DELETE = 3;
   DM_MESSAGE_KIND_REACTION = 4;
+  // A group DM's name, set by a member (§ 6.19 "Content"); never in live
+  // mode.
+  DM_MESSAGE_KIND_GROUP_NAME = 5;
 }
 
 // The server as MLS external sender (§ 6.19): its Ed25519 key, and the
@@ -2315,4 +2323,79 @@ message MlsUpdateRequested {}
 // Envelope body 21 (§ 6.19).
 message MlsDelivery {
   repeated MlsEntry entries = 1;
+}
+
+// What an MLS DM's application message carries (§ 6.19 "Content"): a
+// member's client encodes it and encrypts it as the MLS application data;
+// the server never decodes it. A receiver skips a body it does not know and
+// drops one that breaks § 6.19's rules.
+message DmContent {
+  // 16 random bytes the sender chose: what replies, edits, deletes and
+  // reactions name.
+  bytes id = 1;
+  // Its clear `kind`: text MESSAGE, edit EDIT, delete DELETE, reaction
+  // REACTION, group_name GROUP_NAME.
+  oneof body {
+    DmText text = 2;
+    DmEdit edit = 3;
+    DmDelete delete = 4;
+    DmReaction reaction = 5;
+    DmGroupName group_name = 6;
+  }
+}
+
+// A message: text of 0–4,000 bytes (at least 1 without attachments).
+message DmText {
+  string text = 1;
+  // The `id` of the message it replies to.
+  optional bytes reply_to = 2;
+  // Its files' keys (§ 6.19 "Attachments"), sent with the message.
+  repeated EncryptedAttachment attachments = 3;
+  // Account ids it mentions, members of the group (at most 10).
+  repeated uint64 mentions = 4;
+}
+
+// An edit of the sender's own message `target` (an `id`): its new text.
+message DmEdit {
+  bytes target = 1;
+  string text = 2;
+}
+
+// A delete of the sender's own message `target` (an `id`).
+message DmDelete {
+  bytes target = 1;
+}
+
+// A reaction to the message `target` (an `id`), added (`on`) or removed.
+message DmReaction {
+  bytes target = 1;
+  EmojiRef emoji = 2;
+  bool on = 3;
+}
+
+// A group DM's name: 0–100 bytes, § 6.8's name rules.
+message DmGroupName {
+  string name = 1;
+}
+
+// A file the client uploaded encrypted (§ 6.19 "Attachments"): the
+// upload's id, its 32-byte key and the SHA-256 of the uploaded bytes, and
+// what the server never sees about it.
+message EncryptedAttachment {
+  uint64 attachment_id = 1;
+  bytes key = 2;
+  bytes digest = 3;
+  string name = 4;
+  string mime = 5;
+  uint64 size = 6;
+  EncryptedThumbnail thumbnail = 7;
+}
+
+// A preview of an attachment, uploaded encrypted as an upload of its own.
+message EncryptedThumbnail {
+  uint64 attachment_id = 1;
+  bytes key = 2;
+  bytes digest = 3;
+  string mime = 4;
+  uint64 size = 5;
 }
