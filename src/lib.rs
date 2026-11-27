@@ -170,7 +170,7 @@ pub fn minor_of(body: &v1::envelope::Body) -> u32 {
 
 /// Each command kind's name for metrics labels (§ 6.13), at its
 /// [`command_kind_index`]: its field name in `Command.kind`.
-pub const COMMAND_KIND_NAMES: [&str; 89] = [
+pub const COMMAND_KIND_NAMES: [&str; 90] = [
     "get_space",
     "update_space",
     "set_space_icon",
@@ -260,6 +260,7 @@ pub const COMMAND_KIND_NAMES: [&str; 89] = [
     "publish_key_packages",
     "submit_mls_commit",
     "ack_mls",
+    "request_mls_rejoin",
 ];
 
 /// A command kind's place in [`COMMAND_KIND_NAMES`]. Exhaustive, so a new
@@ -356,6 +357,7 @@ pub fn command_kind_index(kind: &v1::command::Kind) -> usize {
         Kind::PublishKeyPackages(_) => 86,
         Kind::SubmitMlsCommit(_) => 87,
         Kind::AckMls(_) => 88,
+        Kind::RequestMlsRejoin(_) => 89,
     }
 }
 
@@ -462,7 +464,8 @@ pub fn command_minor(kind: &v1::command::Kind) -> u32 {
         Kind::ReserveDm(_)
         | Kind::PublishKeyPackages(_)
         | Kind::SubmitMlsCommit(_)
-        | Kind::AckMls(_) => 11,
+        | Kind::AckMls(_)
+        | Kind::RequestMlsRejoin(_) => 11,
     }
 }
 

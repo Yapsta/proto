@@ -47,6 +47,7 @@ yapsta.v1.Member
 yapsta.v1.Message
 yapsta.v1.MlsCommit
 yapsta.v1.MlsEntry
+yapsta.v1.MlsRejoinRequested
 yapsta.v1.NotificationSetting
 yapsta.v1.OpenDm
 yapsta.v1.PersonalSnapshot
@@ -59,6 +60,7 @@ yapsta.v1.Redeem
 yapsta.v1.RelayTarget
 yapsta.v1.RemoveDmMember
 yapsta.v1.RenameEmoji
+yapsta.v1.RequestMlsRejoin
 yapsta.v1.ReserveDm
 yapsta.v1.Resume
 yapsta.v1.Role

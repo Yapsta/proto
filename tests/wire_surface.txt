@@ -102,6 +102,9 @@ enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_BANNED = 3
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_KICKED = 2
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_TRANSFERRED = 1
 enum yapsta.v1.MemberRemovedReason.MEMBER_REMOVED_REASON_UNSPECIFIED = 0
+enum yapsta.v1.MlsRejoinReason.MLS_REJOIN_REASON_FORK = 2
+enum yapsta.v1.MlsRejoinReason.MLS_REJOIN_REASON_LOST_STATE = 1
+enum yapsta.v1.MlsRejoinReason.MLS_REJOIN_REASON_UNSPECIFIED = 0
 enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_ALL = 1
 enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_MENTIONS = 2
 enum yapsta.v1.NotifyLevel.NOTIFY_LEVEL_NONE = 3
@@ -323,6 +326,7 @@ field yapsta.v1.Command.remove_dm_reaction = 78 singular .yapsta.v1.RemoveDmReac
 field yapsta.v1.Command.remove_member_role = 16 singular .yapsta.v1.RemoveMemberRole oneof kind
 field yapsta.v1.Command.remove_reaction = 32 singular .yapsta.v1.RemoveReaction oneof kind
 field yapsta.v1.Command.rename_emoji = 40 singular .yapsta.v1.RenameEmoji oneof kind
+field yapsta.v1.Command.request_mls_rejoin = 90 singular .yapsta.v1.RequestMlsRejoin oneof kind
 field yapsta.v1.Command.reserve_dm = 86 singular .yapsta.v1.ReserveDm oneof kind
 field yapsta.v1.Command.revoke_invite = 25 singular .yapsta.v1.RevokeInvite oneof kind
 field yapsta.v1.Command.rotate_bot = 61 singular .yapsta.v1.RotateBot oneof kind
@@ -705,6 +709,7 @@ field yapsta.v1.MlsEntry.epoch = 3 singular uint64
 field yapsta.v1.MlsEntry.handshake = 4 singular bytes oneof entry
 field yapsta.v1.MlsEntry.message = 5 singular .yapsta.v1.Message oneof entry
 field yapsta.v1.MlsEntry.position = 2 singular uint64
+field yapsta.v1.MlsEntry.rejoin_requested = 8 singular .yapsta.v1.MlsRejoinRequested oneof entry
 field yapsta.v1.MlsEntry.update_requested = 7 singular .yapsta.v1.MlsUpdateRequested oneof entry
 field yapsta.v1.MlsEntry.welcome = 6 singular bytes oneof entry
 field yapsta.v1.MlsExternalSender.certificate = 2 singular bytes
@@ -714,6 +719,10 @@ field yapsta.v1.MlsLog.has_more = 2 singular bool
 field yapsta.v1.MlsLogRequest.after_position = 2 singular uint64
 field yapsta.v1.MlsLogRequest.dm_id = 1 singular uint64
 field yapsta.v1.MlsLogRequest.limit = 3 singular uint32
+field yapsta.v1.MlsRejoinRequested.account_id = 1 singular uint64
+field yapsta.v1.MlsRejoinRequested.device_pub = 2 singular bytes
+field yapsta.v1.MlsRejoinRequested.key_package = 3 singular bytes
+field yapsta.v1.MlsRejoinRequested.reason = 4 singular .yapsta.v1.MlsRejoinReason
 field yapsta.v1.MoveChannel.channel_id = 1 singular uint64
 field yapsta.v1.MoveChannel.parent_id = 2 optional uint64
 field yapsta.v1.MoveChannel.position = 3 singular uint32
@@ -826,6 +835,9 @@ field yapsta.v1.Request.upload_attachment = 9 singular .yapsta.v1.UploadAttachme
 field yapsta.v1.Request.upload_image = 3 singular .yapsta.v1.UploadImageRequest oneof kind
 field yapsta.v1.Request.upload_url = 12 singular .yapsta.v1.UploadUrlRequest oneof kind
 field yapsta.v1.Request.webhook_list = 18 singular .yapsta.v1.WebhookListRequest oneof kind
+field yapsta.v1.RequestMlsRejoin.dm_id = 1 singular uint64
+field yapsta.v1.RequestMlsRejoin.key_package = 2 singular bytes
+field yapsta.v1.RequestMlsRejoin.reason = 3 singular .yapsta.v1.MlsRejoinReason
 field yapsta.v1.ReserveDm.account_ids = 2 repeated uint64
 field yapsta.v1.ReserveDm.kind = 1 singular .yapsta.v1.DmKind
 field yapsta.v1.Response.audit_page = 8 singular .yapsta.v1.AuditPage oneof kind
@@ -1202,6 +1214,7 @@ message yapsta.v1.MlsEntry
 message yapsta.v1.MlsExternalSender
 message yapsta.v1.MlsLog
 message yapsta.v1.MlsLogRequest
+message yapsta.v1.MlsRejoinRequested
 message yapsta.v1.MlsUpdateRequested
 message yapsta.v1.MoveChannel
 message yapsta.v1.MoveMember
@@ -1237,6 +1250,7 @@ message yapsta.v1.RemoveMemberRole
 message yapsta.v1.RemoveReaction
 message yapsta.v1.RenameEmoji
 message yapsta.v1.Request
+message yapsta.v1.RequestMlsRejoin
 message yapsta.v1.ReserveDm
 message yapsta.v1.Response
 message yapsta.v1.Resume

@@ -749,6 +749,7 @@ message Command {
     PublishKeyPackages publish_key_packages = 87;
     SubmitMlsCommit submit_mls_commit = 88;
     AckMls ack_mls = 89;
+    RequestMlsRejoin request_mls_rejoin = 90;
   }
 }
 
@@ -2315,6 +2316,8 @@ message MlsEntry {
     // One of the group's devices is behind: a member should commit an
     // empty Update (§ 6.19, the ratchet window).
     MlsUpdateRequested update_requested = 7;
+    // A device of a member asks to be added again (§ 6.19 "Rejoining").
+    MlsRejoinRequested rejoin_requested = 8;
   }
 }
 
@@ -2398,4 +2401,33 @@ message EncryptedThumbnail {
   bytes digest = 3;
   string mime = 4;
   uint64 size = 5;
+}
+
+// Why a device asks to rejoin (§ 6.19 "Rejoining"): for the members'
+// clients only; the server treats every reason alike. Open: a client reads
+// an unknown one as UNSPECIFIED.
+enum MlsRejoinReason {
+  MLS_REJOIN_REASON_UNSPECIFIED = 0;
+  // The device lost its group state.
+  MLS_REJOIN_REASON_LOST_STATE = 1;
+  // The device's group forked from the log's.
+  MLS_REJOIN_REASON_FORK = 2;
+}
+
+// 90: the session's own device asks the members of an MLS DM to add it
+// again, with a fresh KeyPackage of it (TLS-encoded, checked as a published
+// one is) (§ 6.19 "Rejoining").
+message RequestMlsRejoin {
+  uint64 dm_id = 1;
+  bytes key_package = 2;
+  MlsRejoinReason reason = 3;
+}
+
+// The log entry of a rejoin request, for every other current device of the
+// group: the device asking, its KeyPackage and its reason.
+message MlsRejoinRequested {
+  uint64 account_id = 1;
+  bytes device_pub = 2;
+  bytes key_package = 3;
+  MlsRejoinReason reason = 4;
 }

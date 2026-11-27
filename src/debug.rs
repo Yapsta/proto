@@ -14,7 +14,8 @@ use std::marker::PhantomData;
 
 use crate::v1::{
     AccountDeviceList, ClaimKeyPackagesRequest, ClaimedKeyPackage, DeviceListsRequest,
-    DmEncryption, DmMessageKind, MlsCommit, MlsEntry, PublishKeyPackages, ReserveDm, mls_entry,
+    DmEncryption, DmMessageKind, MlsCommit, MlsEntry, MlsRejoinReason, MlsRejoinRequested,
+    PublishKeyPackages, RequestMlsRejoin, ReserveDm, mls_entry,
 };
 use crate::v1::{
     AddDmMember, Block, BlockUpdated, CreateGroupDm, Dm, DmKind, DmReactionAdded,
@@ -135,6 +136,7 @@ macro_rules! redacting_debug {
     (@show $field:ident dm_mode) => { known::<DmMode>(*$field) };
     (@show $field:ident dm_encryption) => { known::<DmEncryption>(*$field) };
     (@show $field:ident dm_message_kind) => { known::<DmMessageKind>(*$field) };
+    (@show $field:ident rejoin_reason) => { known::<MlsRejoinReason>(*$field) };
     (@show $field:ident notify_target) => { known::<NotifyTarget>(*$field) };
     (@show $field:ident notify_level) => { known::<NotifyLevel>(*$field) };
 }
@@ -602,6 +604,7 @@ impl fmt::Debug for mls_entry::Entry {
             Self::Message(m) => f.debug_tuple("Message").field(m).finish(),
             Self::Welcome(b) => f.debug_tuple("Welcome").field(&Redacted(b.len())).finish(),
             Self::UpdateRequested(_) => f.write_str("UpdateRequested"),
+            Self::RejoinRequested(r) => f.debug_tuple("RejoinRequested").field(r).finish(),
         }
     }
 }
@@ -665,6 +668,19 @@ redacting_debug!(EncryptedThumbnail {
     digest: text,
     mime: text,
     size: hidden,
+});
+// § 6.19 "Rejoining": the KeyPackage by length only, and who asks (a
+// device of an account, next to its DM) never.
+redacting_debug!(RequestMlsRejoin {
+    dm_id,
+    key_package: text,
+    reason: rejoin_reason,
+});
+redacting_debug!(MlsRejoinRequested {
+    account_id: hidden,
+    device_pub: hidden,
+    key_package: text,
+    reason: rejoin_reason,
 });
 redacting_debug!(RemoveDmMember {
     dm_id,
