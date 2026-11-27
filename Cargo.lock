@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "yapsta-proto"
-version = "1.11.1"
+version = "1.11.2"
 dependencies = [
  "bip39",
  "bytes",
