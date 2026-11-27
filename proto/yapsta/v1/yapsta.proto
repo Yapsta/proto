@@ -1363,6 +1363,9 @@ message SearchRequest {
 
 message UploadAttachmentRequest {
   bytes data = 1;
+  // Minor 11 (§ 6.5, § 6.19): the bytes are a client-encrypted file for an
+  // MLS DM, stored as they are, never sniffed or thumbnailed.
+  bool encrypted = 2;
 }
 
 message FetchAttachmentRequest {
@@ -1377,6 +1380,8 @@ message AttachmentUrlRequest {
 
 message UploadUrlRequest {
   uint64 size = 1;
+  // As `UploadAttachmentRequest.encrypted`.
+  bool encrypted = 2;
 }
 
 // Responses.

@@ -10,6 +10,14 @@ other release (README.md, Versioning).
 
 ### Added
 
+- `UploadAttachmentRequest.encrypted` and `UploadUrlRequest.encrypted`
+  (field 2 of each): an upload a client encrypted for an MLS DM, stored as
+  `application/octet-stream`, never sniffed or thumbnailed, at the client's
+  padded size, under the same caps, quotas, free-disk floor and rate
+  (PROTOCOL.md § 6.5 "Encrypted uploads", § 6.19 "Attachments"). An MLS DM
+  message takes only the sender's encrypted uploads (at most 10, thumbnails
+  included); a channel or plaintext DM message naming one is `INVALID`.
+  Golden examples of both paths; a plaintext upload's bytes are unchanged.
 - `request_mls_rejoin` (command 90), `RequestMlsRejoin` and
   `MlsRejoinReason` (`LOST_STATE`, `FORK`; open): a device that lost its MLS
   state, or whose group forked, asks the members to add it again with a
