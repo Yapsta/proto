@@ -1343,7 +1343,7 @@ DMs whose content only the members' devices can read: Messaging Layer Security (
 enum DmEncryption{DM_ENCRYPTION_UNSPECIFIED = 0 (plaintext, § 6.17), MLS = 1}
 enum DmMessageKind{DM_MESSAGE_KIND_UNSPECIFIED = 0, MESSAGE = 1, EDIT = 2, DELETE = 3, REACTION = 4, GROUP_NAME = 5}
 Dm gains: encryption: DmEncryption = 7, successor_dm_id: optional u64 = 8, mls_group_id: bytes = 9
-Message gains: ciphertext: bytes = 17, dm_kind: DmMessageKind = 18, mls_epoch: u64 = 19
+Message gains: ciphertext: bytes = 17, dm_kind: DmMessageKind = 18, mls_epoch: u64 = 19, delete_id: optional u64 = 20
 Error gains: mls_epoch: optional u64 = 5
 Welcome gains: mls_external_sender: optional MlsExternalSender = 9
 MlsExternalSender{key: bytes = 1, certificate: bytes = 2}
@@ -1406,12 +1406,14 @@ and `open_dm`, `create_group_dm` and `add_dm_member` gain the MLS commit that ad
   - the body does not match the clear `kind`;
   - a limit is broken: `text` and an edit's `text` at most 4,000 bytes, and at least 1 for a `text` without attachments; `reply_to` and `target` 16 bytes; `key` and `digest` 32 bytes; `mentions` at most 10, each a member; a group name over 100 bytes or against § 6.8's name rules; a reaction with no emoji, an emoji of a kind it does not know, or a Unicode emoji outside the rule above;
   - the replies disagree: a clear `reply_to` without `text.reply_to`, or, when the receiver knows which `id` the clear `reply_to`'s message has, a `text.reply_to` naming another; in live mode, any `text.reply_to`;
-  - the attachment ids, thumbnails included, are not exactly the clear `attachment_ids`;
-  - an edit, delete or reaction names a `target` it does not have; an edit or delete names one that is not a `text` message, or whose author is not the MLS sender's account (the account, not the device); a delete's `target` is not the `id` of the message whose server id is the clear `delete_id`;
+  - the attachment ids, thumbnails included, are not exactly the ids of the delivered `Message.attachments` (below);
+  - an edit, delete or reaction names a `target` it does not have; an edit or delete names one that is not a `text` message, or whose author is not the MLS sender's account (the account, not the device); a delete's `target` is not the `id` of the message whose server id is the delivered `Message.delete_id`, when that field is present;
   - a reaction adds a 21st distinct emoji to its target (§ 6.17's 20 per message: the first 20 distinct in log order stay);
   - a `GROUP_NAME` comes in a 1:1 or in live mode.
 
   A body it does not know (a field from a newer peer) is skipped. A group's name is the last `GROUP_NAME` in log order.
+
+  What the server delivers in clear beside the ciphertext: a `DELETE`'s `Message.delete_id` is the server id of the message it dropped (stored delivery and history; absent from a server that does not keep it, and the check above then waits for it); an MLS DM message's `Message.attachments` lists each upload named in its clear `attachment_ids` with only `id` and `size` set (`size` the stored, padded upload's), never a name, media type or other descriptor, and the receiver compares those ids with the inner set. The attachment list takes effect once the server supports encrypted attachments; until then it refuses `attachment_ids` on an MLS DM message.
 - **Blocks** withhold application messages as § 6.17 says (by the sending session's account); handshakes and Welcomes always reach every device of the group.
 - **Removals by the server.** The server sends, as its own PublicMessage proposals signed with its external-sender key and entered in the log, a Remove for the leaf of: a device revoked or expired in its account's newest device list; every device of an erased account; every device of an account removed from, or leaving, the group DM; a device that has not acknowledged its log for the shorter of `dm_retention_days` and 90 days. The server stops delivering to a device as soon as it proposes its removal. A Remove proposal belongs to its epoch: until a commit removes the leaf, the server proposes it again in each new epoch.
 - **The ratchet window.** When a device has 500 unacknowledged application messages in one epoch, the server sends every other current device of the group an `MlsUpdateRequested` entry; a member's client then commits an empty Update.

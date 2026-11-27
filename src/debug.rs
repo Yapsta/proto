@@ -448,6 +448,7 @@ redacting_debug!(Message {
     ciphertext: text,
     dm_kind: dm_message_kind,
     mls_epoch,
+    delete_id,
 });
 redacting_debug!(EmojiRef { emoji });
 
@@ -632,11 +633,22 @@ redacting_debug!(DmEdit {
     text: text,
 });
 redacting_debug!(DmDelete { target: text });
-redacting_debug!(DmReaction {
-    target: text,
-    emoji,
-    on,
-});
+// Which emoji was reacted with is content too: its kind only.
+impl fmt::Debug for DmReaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { target, emoji, on } = self;
+        let kind = emoji.as_ref().map(|e| match e.emoji {
+            Some(emoji_ref::Emoji::Unicode(_)) => "unicode",
+            Some(emoji_ref::Emoji::CustomId(_)) => "custom",
+            None => "unknown",
+        });
+        f.debug_struct("DmReaction")
+            .field("target", &Redacted(target.len()))
+            .field("emoji", &kind)
+            .field("on", on)
+            .finish()
+    }
+}
 redacting_debug!(DmGroupName { name: text });
 redacting_debug!(EncryptedAttachment {
     attachment_id,

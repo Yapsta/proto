@@ -663,6 +663,7 @@ field yapsta.v1.Message.channel_id = 2 singular uint64
 field yapsta.v1.Message.ciphertext = 17 singular bytes
 field yapsta.v1.Message.content = 6 singular string
 field yapsta.v1.Message.created_at = 5 singular uint64
+field yapsta.v1.Message.delete_id = 20 optional uint64
 field yapsta.v1.Message.deleted = 12 singular bool
 field yapsta.v1.Message.dm_id = 16 optional uint64
 field yapsta.v1.Message.dm_kind = 18 singular .yapsta.v1.DmMessageKind

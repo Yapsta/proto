@@ -189,6 +189,19 @@ fn debug_shows_none_of_the_content() {
         assert!(!shown.contains("png"), "{name}: {shown}");
         assert!(!shown.contains("image"), "{name}: {shown}");
     }
+    // Nor which custom emoji was reacted with: the kind only.
+    let shown = format!(
+        "{:?}",
+        DmReaction {
+            target: vec![PLANT; 16],
+            emoji: Some(EmojiRef {
+                emoji: Some(emoji_ref::Emoji::CustomId(4_242_424)),
+            }),
+            on: true,
+        }
+    );
+    assert!(!shown.contains("4242424"), "{shown}");
+    assert!(shown.contains("custom"), "{shown}");
     // A file's size is the client's own: never shown.
     let shown = format!("{:?}", attachment());
     assert!(!shown.contains("4096"), "{shown}");

@@ -19,8 +19,12 @@ other release (README.md, Versioning).
   and the server never decodes it.
 - `DmMessageKind.DM_MESSAGE_KIND_GROUP_NAME = 5`, the clear kind of a group
   DM's name change.
-- Redacting `Debug` for every new message (lengths and counts only, and a
-  file's size not at all); tests
+- `Message.delete_id` (field 20): on an MLS DM's `DELETE`, the server id of
+  the message it dropped, so a receiver can check the delete's inner target.
+  § 6.19 also fixes what `Message.attachments` holds for an MLS DM (only
+  each upload's `id` and padded `size`).
+- Redacting `Debug` for every new message (lengths and counts only; a
+  file's size and a custom reaction's emoji id not at all); tests
   for each body's round trip and committed bytes, an unknown body and emoji
   kind, the kinds' numbers and the `Debug` output; a golden example of
   `GROUP_NAME`.

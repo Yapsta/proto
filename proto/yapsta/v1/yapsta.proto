@@ -1094,6 +1094,10 @@ message Message {
   bytes ciphertext = 17;
   DmMessageKind dm_kind = 18;
   uint64 mls_epoch = 19;
+  // On an MLS DM's message of kind DELETE, stored and in history: the
+  // server id of the message it dropped (its clear `delete_id`), so a
+  // receiver can check the delete's inner `target` (§ 6.19 "Content").
+  optional uint64 delete_id = 20;
 }
 
 message Mentions {
