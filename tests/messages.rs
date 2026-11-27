@@ -2068,10 +2068,6 @@ fn mls_message() -> yapsta_proto::v1::Message {
     }
 }
 
-/// Minor 11 (§ 6.19): every MLS command, request, response and body, and
-/// the fields minor 11 adds to older messages.
-/// § 6.19 "Content": a group DM's name travels as kind GROUP_NAME (5), an
-/// additive value of the minor-11 enum; its body is a `DmContent` inside
 /// § 6.19 "Rejoining": a device's request to be added again, and the log
 /// entry the group's other devices get. KeyPackage bytes and the asking
 /// account are planted so the Debug test can look for them.
@@ -2149,6 +2145,8 @@ fn a_rejoin_request_is_minor_11_and_redacted() {
     assert!(shown.contains("reason: Fork"), "{shown}");
 }
 
+/// § 6.19 "Content": a group DM's name travels as kind GROUP_NAME (5), an
+/// additive value of the minor-11 enum; its body is a `DmContent` inside
 /// the ciphertext (tests/dm_content.rs).
 fn dm_content_examples() -> Vec<(&'static str, Envelope)> {
     vec![
@@ -2198,6 +2196,8 @@ fn dm_content_examples() -> Vec<(&'static str, Envelope)> {
     ]
 }
 
+/// Minor 11 (§ 6.19): every MLS command, request, response and body, and
+/// the fields minor 11 adds to older messages.
 fn m11_mls_examples() -> Vec<(&'static str, Envelope)> {
     let cmd = |request_id, kind| Envelope {
         request_id,

@@ -16,8 +16,9 @@ other release (README.md, Versioning).
   fresh KeyPackage (PROTOCOL.md § 6.19 "Rejoining"). `MlsEntry.entry` gains
   `rejoin_requested` (8), `MlsRejoinRequested`, which the group's other
   devices get. The server's checks and effects, the members' response and
-  the rate limits (per device 3 an hour, burst 2; per DM and account 10 a
-  day) are in § 6.19. Additive within minor 11, under `MLS_DMS`.
+  the rate limits (per device and DM 3 an hour, burst 2; per DM and account
+  10 a day) are in § 6.19. § 6.19 "Delivery and the log" also says a client
+  acknowledges an entry whose kind it does not know. Additive within minor 11, under `MLS_DMS`.
 - Redacting `Debug` for both new messages (the KeyPackage by length, never
   the asking account or device); a golden example of each, the command's
   minor and metrics name, and the reasons' numbers.
