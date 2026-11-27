@@ -1404,12 +1404,14 @@ and `open_dm`, `create_group_dm` and `add_dm_member` gain the MLS commit that ad
   A receiver drops a message, as if never sent, when:
   - `id` is not 16 bytes, or an `id` it already has comes again (the first in log order wins; the `id` of a message whose body it skipped, below, counts too);
   - the body does not match the clear `kind`;
-  - a limit is broken: `text` and an edit's `text` at most 4,000 bytes, and at least 1 for a `text` without attachments; `reply_to` and `target` 16 bytes; `key` and `digest` 32 bytes; `mentions` at most 10, each a member; a group name over 100 bytes or against § 6.8's name rules; a reaction with no emoji, an emoji of a kind it does not know, or a Unicode emoji outside the rule above;
+  - a limit is broken: `text` and an edit's `text` at most 4,000 bytes, and at least 1 for a `text` without attachments; `reply_to` and `target` 16 bytes; `key` and `digest` 32 bytes; `mentions` at most 10; a group name over 100 bytes or against § 6.8's name rules; a reaction with no emoji, an emoji of a kind it does not know, or a Unicode emoji outside the rule above;
   - the replies disagree: a clear `reply_to` without `text.reply_to`, or, when the receiver knows which `id` the clear `reply_to`'s message has, a `text.reply_to` naming another; in live mode, any `text.reply_to`;
   - the attachment ids, thumbnails included, are not exactly the ids of the delivered `Message.attachments` (below);
-  - an edit, delete or reaction names a `target` it does not have; an edit or delete names one that is not a `text` message, or whose author is not the MLS sender's account (the account, not the device); a delete's `target` is not the `id` of the message whose server id is the delivered `Message.delete_id`, when that field is present;
+  - an edit or delete names a `target` (once the receiver has it, below) that is not a `text` message, or whose author is not the MLS sender's account (the account, not the device); a delete's `target` is not the `id` of the message whose server id is the delivered `Message.delete_id`, when that field is present;
   - a reaction adds a 21st distinct emoji to its target (§ 6.17's 20 per message: the first 20 distinct in log order stay);
   - a `GROUP_NAME` comes in a 1:1 or in live mode.
+
+  An edit, delete or reaction whose `target` the receiver has not loaded yet (a device added since, or a target on an older `dm_history` page) is not dropped: it waits, is never shown on its own, and applies once the target is loaded and passes the checks above, or is dropped then. A receiver may cap how many it keeps waiting, dropping the oldest first. A mention of an account that is not a member, by the receiver's current roster (`Dm.member_ids`), is ignored; the message stays.
 
   A body it does not know (a field from a newer peer) is skipped. A group's name is the last `GROUP_NAME` in log order.
 
