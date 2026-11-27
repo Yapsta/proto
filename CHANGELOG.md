@@ -10,6 +10,17 @@ other release (README.md, Versioning).
 
 ### Added
 
+- `request_mls_rejoin` (command 90), `RequestMlsRejoin` and
+  `MlsRejoinReason` (`LOST_STATE`, `FORK`; open): a device that lost its MLS
+  state, or whose group forked, asks the members to add it again with a
+  fresh KeyPackage (PROTOCOL.md § 6.19 "Rejoining"). `MlsEntry.entry` gains
+  `rejoin_requested` (8), `MlsRejoinRequested`, which the group's other
+  devices get. The server's checks and effects, the members' response and
+  the rate limits (per device 3 an hour, burst 2; per DM and account 10 a
+  day) are in § 6.19. Additive within minor 11, under `MLS_DMS`.
+- Redacting `Debug` for both new messages (the KeyPackage by length, never
+  the asking account or device); a golden example of each, the command's
+  minor and metrics name, and the reasons' numbers.
 - `DmContent`, the plaintext inside an MLS DM's ciphertext (PROTOCOL.md
   § 6.19 "Content"): a sender-chosen 16-byte `id` and one body (`DmText`,
   `DmEdit`, `DmDelete`, `DmReaction`, `DmGroupName`), with

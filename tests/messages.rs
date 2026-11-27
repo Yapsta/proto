@@ -2072,6 +2072,83 @@ fn mls_message() -> yapsta_proto::v1::Message {
 /// the fields minor 11 adds to older messages.
 /// § 6.19 "Content": a group DM's name travels as kind GROUP_NAME (5), an
 /// additive value of the minor-11 enum; its body is a `DmContent` inside
+/// § 6.19 "Rejoining": a device's request to be added again, and the log
+/// entry the group's other devices get. KeyPackage bytes and the asking
+/// account are planted so the Debug test can look for them.
+fn mls_rejoin_examples() -> Vec<(&'static str, Envelope)> {
+    vec![
+        (
+            "m11_request_mls_rejoin",
+            Envelope {
+                request_id: 212,
+                last: false,
+                body: Some(Body::Command(Command {
+                    kind: Some(command::Kind::RequestMlsRejoin(RequestMlsRejoin {
+                        dm_id: 5,
+                        key_package: mls_bytes(40),
+                        reason: MlsRejoinReason::LostState.into(),
+                    })),
+                })),
+            },
+        ),
+        (
+            "m11_mls_rejoin_requested",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Mls(MlsDelivery {
+                    entries: vec![MlsEntry {
+                        dm_id: 5,
+                        position: 18,
+                        epoch: 4,
+                        entry: Some(mls_entry::Entry::RejoinRequested(MlsRejoinRequested {
+                            account_id: 4_242_424,
+                            device_pub: mls_bytes(32),
+                            key_package: mls_bytes(40),
+                            reason: MlsRejoinReason::Fork.into(),
+                        })),
+                    }],
+                })),
+            },
+        ),
+    ]
+}
+
+/// A rejoin request is a minor-11 command, the 90th, named for metrics; its
+/// reasons are pinned; and `Debug` shows neither the KeyPackage nor who asks.
+#[test]
+fn a_rejoin_request_is_minor_11_and_redacted() {
+    use yapsta_proto::{command_kind_name, command_minor};
+    let kind = command::Kind::RequestMlsRejoin(RequestMlsRejoin::default());
+    assert_eq!(command_minor(&kind), 11);
+    assert_eq!(command_kind_name(&kind), "request_mls_rejoin");
+    assert_eq!(
+        [
+            MlsRejoinReason::Unspecified as i32,
+            MlsRejoinReason::LostState as i32,
+            MlsRejoinReason::Fork as i32,
+        ],
+        [0, 1, 2]
+    );
+    let planted = format!("{MLS_SECRET_BYTE}");
+    for (name, env) in mls_rejoin_examples() {
+        let shown = format!("{env:?}");
+        assert!(!shown.contains(&planted), "{name}: {shown}");
+        assert!(!shown.contains("4242424"), "{name}: {shown}");
+    }
+    let shown = format!(
+        "{:?}",
+        RequestMlsRejoin {
+            reason: 97,
+            ..RequestMlsRejoin::default()
+        }
+    );
+    assert!(shown.contains("reason: Unknown(97)"), "{shown}");
+    let shown = format!("{:?}", mls_rejoin_examples()[1].1);
+    assert!(shown.contains("RejoinRequested"), "{shown}");
+    assert!(shown.contains("reason: Fork"), "{shown}");
+}
+
 /// the ciphertext (tests/dm_content.rs).
 fn dm_content_examples() -> Vec<(&'static str, Envelope)> {
     vec![
@@ -3191,6 +3268,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m11_examples())
     .chain(m11_mls_examples())
     .chain(dm_content_examples())
+    .chain(mls_rejoin_examples())
     .collect()
 }
 
