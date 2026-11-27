@@ -430,6 +430,7 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
                 false,
                 request(R::UploadAttachment(UploadAttachmentRequest {
                     data: vec![0xcd; 8],
+                    encrypted: false,
                 })),
             ),
         ),
@@ -460,7 +461,10 @@ fn m3_examples() -> Vec<(&'static str, Envelope)> {
             env(
                 58,
                 false,
-                request(R::UploadUrl(UploadUrlRequest { size: 10 << 20 })),
+                request(R::UploadUrl(UploadUrlRequest {
+                    size: 10 << 20,
+                    encrypted: false,
+                })),
             ),
         ),
         (
@@ -2068,6 +2072,67 @@ fn mls_message() -> yapsta_proto::v1::Message {
     }
 }
 
+/// § 6.5, § 6.19 "Attachments": an encrypted upload by either path, its
+/// flag the only new bytes.
+fn encrypted_upload_examples() -> Vec<(&'static str, Envelope)> {
+    use request::Kind as R;
+    let request = |request_id, kind| Envelope {
+        request_id,
+        last: false,
+        body: Some(Body::Request(Request { kind: Some(kind) })),
+    };
+    vec![
+        (
+            "m11_upload_attachment_encrypted",
+            request(
+                213,
+                R::UploadAttachment(UploadAttachmentRequest {
+                    data: mls_bytes(256),
+                    encrypted: true,
+                }),
+            ),
+        ),
+        (
+            "m11_upload_url_encrypted",
+            request(
+                214,
+                R::UploadUrl(UploadUrlRequest {
+                    size: 10 << 20,
+                    encrypted: true,
+                }),
+            ),
+        ),
+    ]
+}
+
+/// The flag is field 2 of both requests, and an upload without it encodes
+/// as before (a plaintext upload's bytes do not change); `Debug` shows the
+/// flag and still none of the file.
+#[test]
+fn the_encrypted_flag_is_field_2_and_only_its_own_bytes() {
+    let plain = UploadUrlRequest {
+        size: 7,
+        encrypted: false,
+    }
+    .encode_to_vec();
+    assert_eq!(plain, [0x08, 0x07]);
+    let encrypted = UploadUrlRequest {
+        size: 7,
+        encrypted: true,
+    }
+    .encode_to_vec();
+    assert_eq!(encrypted, [0x08, 0x07, 0x10, 0x01]);
+    let shown = format!(
+        "{:?}",
+        UploadAttachmentRequest {
+            data: mls_bytes(256),
+            encrypted: true,
+        }
+    );
+    assert!(shown.contains("encrypted: true"), "{shown}");
+    assert!(!shown.contains(&format!("{MLS_SECRET_BYTE}")), "{shown}");
+}
+
 /// § 6.19 "Rejoining": a device's request to be added again, and the log
 /// entry the group's other devices get. KeyPackage bytes and the asking
 /// account are planted so the Debug test can look for them.
@@ -3269,6 +3334,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m11_mls_examples())
     .chain(dm_content_examples())
     .chain(mls_rejoin_examples())
+    .chain(encrypted_upload_examples())
     .collect()
 }
 

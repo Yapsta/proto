@@ -737,7 +737,10 @@ redacting_debug!(SearchRequest {
     before_id,
     limit
 });
-redacting_debug!(UploadAttachmentRequest { data: text });
+redacting_debug!(UploadAttachmentRequest {
+    data: text,
+    encrypted,
+});
 redacting_debug!(SignedUrl {
     url: text,
     expires_at
