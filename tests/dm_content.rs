@@ -189,6 +189,10 @@ fn debug_shows_none_of_the_content() {
         assert!(!shown.contains("png"), "{name}: {shown}");
         assert!(!shown.contains("image"), "{name}: {shown}");
     }
+    // A file's size is the client's own: never shown.
+    let shown = format!("{:?}", attachment());
+    assert!(!shown.contains("4096"), "{shown}");
+    assert!(!shown.contains("512"), "{shown}");
     let shown = format!(
         "{:?}",
         DmText {

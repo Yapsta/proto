@@ -606,7 +606,8 @@ impl fmt::Debug for mls_entry::Entry {
 }
 // § 6.19 "Content": what an MLS DM's ciphertext carries is content
 // through and through: its ids, text, keys, digests, names and types are
-// shown by length only, and its mentions by count.
+// shown by length only, its mentions by count, and a file's size not at
+// all (the server sees only the padded upload).
 redacting_debug!(DmContent { id: text, body });
 
 impl fmt::Debug for dm_content::Body {
@@ -643,7 +644,7 @@ redacting_debug!(EncryptedAttachment {
     digest: text,
     name: text,
     mime: text,
-    size,
+    size: hidden,
     thumbnail,
 });
 redacting_debug!(EncryptedThumbnail {
@@ -651,7 +652,7 @@ redacting_debug!(EncryptedThumbnail {
     key: text,
     digest: text,
     mime: text,
-    size,
+    size: hidden,
 });
 redacting_debug!(RemoveDmMember {
     dm_id,
