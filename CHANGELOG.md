@@ -8,6 +8,8 @@ other release (README.md, Versioning).
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-11-27
+
 ### Added
 
 - `UploadAttachmentRequest.encrypted` and `UploadUrlRequest.encrypted`
