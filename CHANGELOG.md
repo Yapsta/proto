@@ -8,6 +8,22 @@ other release (README.md, Versioning).
 
 ## [Unreleased]
 
+### Added
+
+- `DmContent`, the plaintext inside an MLS DM's ciphertext (PROTOCOL.md
+  § 6.19 "Content"): a sender-chosen 16-byte `id` and one body (`DmText`,
+  `DmEdit`, `DmDelete`, `DmReaction`, `DmGroupName`), with
+  `EncryptedAttachment` and `EncryptedThumbnail` for files' keys, digests,
+  names and types. The sender's padding recipe and the receiver's drop
+  rules are in § 6.19. Additive, within minor 11: `MINOR_VERSION` stays 11,
+  and the server never decodes it.
+- `DmMessageKind.DM_MESSAGE_KIND_GROUP_NAME = 5`, the clear kind of a group
+  DM's name change.
+- Redacting `Debug` for every new message (lengths and counts only); tests
+  for each body's round trip and committed bytes, an unknown body and emoji
+  kind, the kinds' numbers and the `Debug` output; a golden example of
+  `GROUP_NAME`.
+
 ### Changed
 
 - PROTOCOL.md § 6.19 "Commits": only the account a step adds (every member at

@@ -60,6 +60,7 @@ enum yapsta.v1.DmKind.DM_KIND_ONE_TO_ONE = 1
 enum yapsta.v1.DmKind.DM_KIND_UNSPECIFIED = 0
 enum yapsta.v1.DmMessageKind.DM_MESSAGE_KIND_DELETE = 3
 enum yapsta.v1.DmMessageKind.DM_MESSAGE_KIND_EDIT = 2
+enum yapsta.v1.DmMessageKind.DM_MESSAGE_KIND_GROUP_NAME = 5
 enum yapsta.v1.DmMessageKind.DM_MESSAGE_KIND_MESSAGE = 1
 enum yapsta.v1.DmMessageKind.DM_MESSAGE_KIND_REACTION = 4
 enum yapsta.v1.DmMessageKind.DM_MESSAGE_KIND_UNSPECIFIED = 0
@@ -446,6 +447,16 @@ field yapsta.v1.Dm.mls_group_id = 9 singular bytes
 field yapsta.v1.Dm.name = 4 singular string
 field yapsta.v1.Dm.owner_id = 5 singular uint64
 field yapsta.v1.Dm.successor_dm_id = 8 optional uint64
+field yapsta.v1.DmContent.delete = 4 singular .yapsta.v1.DmDelete oneof body
+field yapsta.v1.DmContent.edit = 3 singular .yapsta.v1.DmEdit oneof body
+field yapsta.v1.DmContent.group_name = 6 singular .yapsta.v1.DmGroupName oneof body
+field yapsta.v1.DmContent.id = 1 singular bytes
+field yapsta.v1.DmContent.reaction = 5 singular .yapsta.v1.DmReaction oneof body
+field yapsta.v1.DmContent.text = 2 singular .yapsta.v1.DmText oneof body
+field yapsta.v1.DmDelete.target = 1 singular bytes
+field yapsta.v1.DmEdit.target = 1 singular bytes
+field yapsta.v1.DmEdit.text = 2 singular string
+field yapsta.v1.DmGroupName.name = 1 singular string
 field yapsta.v1.DmHistoryRequest.after = 3 singular uint64 oneof anchor
 field yapsta.v1.DmHistoryRequest.around = 4 singular uint64 oneof anchor
 field yapsta.v1.DmHistoryRequest.before = 2 singular uint64 oneof anchor
@@ -456,6 +467,9 @@ field yapsta.v1.DmList.has_more = 2 singular bool
 field yapsta.v1.DmList.read_states = 3 repeated .yapsta.v1.DmReadState
 field yapsta.v1.DmMessageDeleted.dm_id = 1 singular uint64
 field yapsta.v1.DmMessageDeleted.message_id = 2 singular uint64
+field yapsta.v1.DmReaction.emoji = 2 singular .yapsta.v1.EmojiRef
+field yapsta.v1.DmReaction.on = 3 singular bool
+field yapsta.v1.DmReaction.target = 1 singular bytes
 field yapsta.v1.DmReactionAdded.account_id = 4 singular uint64
 field yapsta.v1.DmReactionAdded.dm_id = 1 singular uint64
 field yapsta.v1.DmReactionAdded.emoji = 3 singular .yapsta.v1.EmojiRef
@@ -469,6 +483,10 @@ field yapsta.v1.DmReadState.last_message_id = 4 singular uint64
 field yapsta.v1.DmReadState.last_read_id = 2 singular uint64
 field yapsta.v1.DmReadState.mention_count = 3 singular uint32
 field yapsta.v1.DmRemoved.dm_id = 1 singular uint64
+field yapsta.v1.DmText.attachments = 3 repeated .yapsta.v1.EncryptedAttachment
+field yapsta.v1.DmText.mentions = 4 repeated uint64
+field yapsta.v1.DmText.reply_to = 2 optional bytes
+field yapsta.v1.DmText.text = 1 singular string
 field yapsta.v1.DmUpdated.dm = 1 singular .yapsta.v1.Dm
 field yapsta.v1.EditDmMessage.content = 3 singular string
 field yapsta.v1.EditDmMessage.dm_id = 1 singular uint64
@@ -480,6 +498,18 @@ field yapsta.v1.EmojiDeleted.emoji_id = 1 singular uint64
 field yapsta.v1.EmojiRef.custom_id = 2 singular uint64 oneof emoji
 field yapsta.v1.EmojiRef.unicode = 1 singular string oneof emoji
 field yapsta.v1.EmojiUpdated.emoji = 1 singular .yapsta.v1.CustomEmoji
+field yapsta.v1.EncryptedAttachment.attachment_id = 1 singular uint64
+field yapsta.v1.EncryptedAttachment.digest = 3 singular bytes
+field yapsta.v1.EncryptedAttachment.key = 2 singular bytes
+field yapsta.v1.EncryptedAttachment.mime = 5 singular string
+field yapsta.v1.EncryptedAttachment.name = 4 singular string
+field yapsta.v1.EncryptedAttachment.size = 6 singular uint64
+field yapsta.v1.EncryptedAttachment.thumbnail = 7 singular .yapsta.v1.EncryptedThumbnail
+field yapsta.v1.EncryptedThumbnail.attachment_id = 1 singular uint64
+field yapsta.v1.EncryptedThumbnail.digest = 3 singular bytes
+field yapsta.v1.EncryptedThumbnail.key = 2 singular bytes
+field yapsta.v1.EncryptedThumbnail.mime = 4 singular string
+field yapsta.v1.EncryptedThumbnail.size = 5 singular uint64
 field yapsta.v1.Envelope.ack = 10 singular .yapsta.v1.Ack oneof body
 field yapsta.v1.Envelope.auth = 5 singular .yapsta.v1.Auth oneof body
 field yapsta.v1.Envelope.command = 14 singular .yapsta.v1.Command oneof body
@@ -1094,13 +1124,19 @@ message yapsta.v1.DeviceLists
 message yapsta.v1.DeviceListsRequest
 message yapsta.v1.DisconnectMember
 message yapsta.v1.Dm
+message yapsta.v1.DmContent
+message yapsta.v1.DmDelete
+message yapsta.v1.DmEdit
+message yapsta.v1.DmGroupName
 message yapsta.v1.DmHistoryRequest
 message yapsta.v1.DmList
 message yapsta.v1.DmMessageDeleted
+message yapsta.v1.DmReaction
 message yapsta.v1.DmReactionAdded
 message yapsta.v1.DmReactionRemoved
 message yapsta.v1.DmReadState
 message yapsta.v1.DmRemoved
+message yapsta.v1.DmText
 message yapsta.v1.DmUpdated
 message yapsta.v1.EditDmMessage
 message yapsta.v1.EditMessage
@@ -1108,6 +1144,8 @@ message yapsta.v1.EmojiCreated
 message yapsta.v1.EmojiDeleted
 message yapsta.v1.EmojiRef
 message yapsta.v1.EmojiUpdated
+message yapsta.v1.EncryptedAttachment
+message yapsta.v1.EncryptedThumbnail
 message yapsta.v1.Envelope
 message yapsta.v1.Ephemeral
 message yapsta.v1.Error

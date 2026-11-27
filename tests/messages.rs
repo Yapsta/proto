@@ -2068,6 +2068,30 @@ fn mls_message() -> yapsta_proto::v1::Message {
 
 /// Minor 11 (§ 6.19): every MLS command, request, response and body, and
 /// the fields minor 11 adds to older messages.
+/// § 6.19 "Content": a group DM's name travels as kind GROUP_NAME (5), an
+/// additive value of the minor-11 enum; its body is a `DmContent` inside
+/// the ciphertext (tests/dm_content.rs).
+fn dm_content_examples() -> Vec<(&'static str, Envelope)> {
+    vec![(
+        "m11_send_dm_group_name",
+        Envelope {
+            request_id: 211,
+            last: false,
+            body: Some(Body::Command(Command {
+                kind: Some(command::Kind::SendDmMessage(SendDmMessage {
+                    dm_id: 6,
+                    content: String::new(),
+                    reply_to: None,
+                    attachment_ids: vec![],
+                    ciphertext: mls_bytes(256),
+                    kind: DmMessageKind::GroupName.into(),
+                    delete_id: None,
+                })),
+            })),
+        },
+    )]
+}
+
 fn m11_mls_examples() -> Vec<(&'static str, Envelope)> {
     let cmd = |request_id, kind| Envelope {
         request_id,
@@ -3137,6 +3161,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m10_examples())
     .chain(m11_examples())
     .chain(m11_mls_examples())
+    .chain(dm_content_examples())
     .collect()
 }
 

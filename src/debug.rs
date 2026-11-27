@@ -37,6 +37,10 @@ use crate::v1::{
     CommandOption, CommandOptionKind, CommandOptionValue, CreateWebhook, Interaction,
     InvokeCommand, SlashCommand, Webhook, WebhookCreated, command_option_value,
 };
+use crate::v1::{
+    DmContent, DmDelete, DmEdit, DmGroupName, DmReaction, DmText, EncryptedAttachment,
+    EncryptedThumbnail, dm_content,
+};
 use crate::v1::{MediaKind, MediaOffer, MediaPublished, PublishMedia, TurnCredentials};
 
 /// Stands in for a redacted value: shows only how long it was.
@@ -600,6 +604,55 @@ impl fmt::Debug for mls_entry::Entry {
         }
     }
 }
+// § 6.19 "Content": what an MLS DM's ciphertext carries is content
+// through and through: its ids, text, keys, digests, names and types are
+// shown by length only, and its mentions by count.
+redacting_debug!(DmContent { id: text, body });
+
+impl fmt::Debug for dm_content::Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Text(b) => f.debug_tuple("Text").field(b).finish(),
+            Self::Edit(b) => f.debug_tuple("Edit").field(b).finish(),
+            Self::Delete(b) => f.debug_tuple("Delete").field(b).finish(),
+            Self::Reaction(b) => f.debug_tuple("Reaction").field(b).finish(),
+            Self::GroupName(b) => f.debug_tuple("GroupName").field(b).finish(),
+        }
+    }
+}
+redacting_debug!(DmText {
+    text: text,
+    reply_to: opt_text,
+    attachments,
+    mentions: ids,
+});
+redacting_debug!(DmEdit {
+    target: text,
+    text: text,
+});
+redacting_debug!(DmDelete { target: text });
+redacting_debug!(DmReaction {
+    target: text,
+    emoji,
+    on,
+});
+redacting_debug!(DmGroupName { name: text });
+redacting_debug!(EncryptedAttachment {
+    attachment_id,
+    key: text,
+    digest: text,
+    name: text,
+    mime: text,
+    size,
+    thumbnail,
+});
+redacting_debug!(EncryptedThumbnail {
+    attachment_id,
+    key: text,
+    digest: text,
+    mime: text,
+    size,
+});
 redacting_debug!(RemoveDmMember {
     dm_id,
     account_id: hidden,
