@@ -14,8 +14,8 @@ use std::marker::PhantomData;
 
 use crate::v1::{
     AccountDeviceList, ClaimKeyPackagesRequest, ClaimedKeyPackage, DeviceListsRequest,
-    DmEncryption, DmMessageKind, MlsCommit, MlsEntry, MlsRejoinReason, MlsRejoinRequested,
-    PublishKeyPackages, RequestMlsRejoin, ReserveDm, mls_entry,
+    DmEncryption, DmMessageKind, MlsCommit, MlsEntry, MlsGroupReset, MlsRejoinReason,
+    MlsRejoinRequested, PublishKeyPackages, RequestMlsRejoin, ReserveDm, mls_entry,
 };
 use crate::v1::{
     AddDmMember, Block, BlockUpdated, CreateGroupDm, Dm, DmKind, DmReactionAdded,
@@ -605,6 +605,7 @@ impl fmt::Debug for mls_entry::Entry {
             Self::Welcome(b) => f.debug_tuple("Welcome").field(&Redacted(b.len())).finish(),
             Self::UpdateRequested(_) => f.write_str("UpdateRequested"),
             Self::RejoinRequested(r) => f.debug_tuple("RejoinRequested").field(r).finish(),
+            Self::GroupReset(r) => f.debug_tuple("GroupReset").field(r).finish(),
         }
     }
 }
@@ -682,6 +683,9 @@ redacting_debug!(MlsRejoinRequested {
     key_package: text,
     reason: rejoin_reason,
 });
+// § 6.19 "Resetting": who reset a group, next to its DM, never. The
+// command's commit is an `MlsCommit`, whose own Debug redacts it.
+redacting_debug!(MlsGroupReset { account_id: hidden });
 redacting_debug!(RemoveDmMember {
     dm_id,
     account_id: hidden,

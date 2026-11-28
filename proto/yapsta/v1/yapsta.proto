@@ -750,6 +750,7 @@ message Command {
     SubmitMlsCommit submit_mls_commit = 88;
     AckMls ack_mls = 89;
     RequestMlsRejoin request_mls_rejoin = 90;
+    ResetMlsGroup reset_mls_group = 91;
   }
 }
 
@@ -2323,6 +2324,9 @@ message MlsEntry {
     MlsUpdateRequested update_requested = 7;
     // A device of a member asks to be added again (§ 6.19 "Rejoining").
     MlsRejoinRequested rejoin_requested = 8;
+    // The group was reset; the first entry of the new group's log
+    // (§ 6.19 "Resetting").
+    MlsGroupReset group_reset = 9;
   }
 }
 
@@ -2435,4 +2439,18 @@ message MlsRejoinRequested {
   bytes device_pub = 2;
   bytes key_package = 3;
   MlsRejoinReason reason = 4;
+}
+
+// 91: a current device of a member replaces an MLS DM's group, when no
+// device of it can still commit, with a new one: `commit` is the epoch-0
+// commit of a new, random group id under the same DM, checked as a new
+// group's first commit is (§ 6.19 "Resetting").
+message ResetMlsGroup {
+  uint64 dm_id = 1;
+  MlsCommit commit = 2;
+}
+
+// The first entry of a reset group's log: the member whose device reset it.
+message MlsGroupReset {
+  uint64 account_id = 1;
 }
