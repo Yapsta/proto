@@ -1388,7 +1388,7 @@ and `open_dm`, `create_group_dm` and `add_dm_member` gain the MLS commit that ad
 
 | # | Kind | Fields | Allowed for | Reply (`Response.kind`) |
 |---|---|---|---|---|
-| 21 | `device_lists` | `account_ids` (1–10) | members, not bots; its own bucket (below) | `device_lists: DeviceLists{lists: repeated AccountDeviceList{account_id = 1, account_pub: bytes = 2, device_list: SignedDeviceList = 3} = 1} = 15`, for each named account that shares a DM with the caller or is named in a DM id it has reserved (others are left out); 8 KiB reserved per account |
+| 21 | `device_lists` | `account_ids` (1–10) | members, not bots; its own bucket (below) | `device_lists: DeviceLists{lists: repeated AccountDeviceList{account_id = 1, account_pub: bytes = 2, device_list: SignedDeviceList = 3} = 1} = 15`, for the caller itself and for each named account that shares a DM with the caller or is named in a DM id it has reserved (others are left out); 8 KiB reserved per account |
 | 22 | `claim_key_packages` | `account_id` | as 21 | `key_packages: ClaimedKeyPackages{key_packages: repeated ClaimedKeyPackage{device_pub: bytes = 1, key_package: bytes = 2, last_resort: bool = 3} = 1} = 16`: one per current device of the account that has one; 4 KiB reserved per device |
 | 23 | `mls_log` | `dm_id`, `after_position`, `limit` (1–100) | a member's device in the MLS DM | `mls_log: MlsLog{entries: repeated MlsEntry = 1, has_more: bool = 2} = 17`: entries up to `limit` and up to 768 KiB encoded in all (at least one entry), `has_more` when either cut it; 1 MiB reserved per request |
 
