@@ -47,6 +47,7 @@ yapsta.v1.Member
 yapsta.v1.Message
 yapsta.v1.MlsCommit
 yapsta.v1.MlsEntry
+yapsta.v1.MlsGroupReset
 yapsta.v1.MlsRejoinRequested
 yapsta.v1.NotificationSetting
 yapsta.v1.OpenDm

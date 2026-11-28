@@ -328,6 +328,7 @@ field yapsta.v1.Command.remove_reaction = 32 singular .yapsta.v1.RemoveReaction 
 field yapsta.v1.Command.rename_emoji = 40 singular .yapsta.v1.RenameEmoji oneof kind
 field yapsta.v1.Command.request_mls_rejoin = 90 singular .yapsta.v1.RequestMlsRejoin oneof kind
 field yapsta.v1.Command.reserve_dm = 86 singular .yapsta.v1.ReserveDm oneof kind
+field yapsta.v1.Command.reset_mls_group = 91 singular .yapsta.v1.ResetMlsGroup oneof kind
 field yapsta.v1.Command.revoke_invite = 25 singular .yapsta.v1.RevokeInvite oneof kind
 field yapsta.v1.Command.rotate_bot = 61 singular .yapsta.v1.RotateBot oneof kind
 field yapsta.v1.Command.send_dm_message = 74 singular .yapsta.v1.SendDmMessage oneof kind
@@ -706,6 +707,7 @@ field yapsta.v1.MlsCommit.welcome = 4 optional bytes
 field yapsta.v1.MlsDelivery.entries = 1 repeated .yapsta.v1.MlsEntry
 field yapsta.v1.MlsEntry.dm_id = 1 singular uint64
 field yapsta.v1.MlsEntry.epoch = 3 singular uint64
+field yapsta.v1.MlsEntry.group_reset = 9 singular .yapsta.v1.MlsGroupReset oneof entry
 field yapsta.v1.MlsEntry.handshake = 4 singular bytes oneof entry
 field yapsta.v1.MlsEntry.message = 5 singular .yapsta.v1.Message oneof entry
 field yapsta.v1.MlsEntry.position = 2 singular uint64
@@ -714,6 +716,7 @@ field yapsta.v1.MlsEntry.update_requested = 7 singular .yapsta.v1.MlsUpdateReque
 field yapsta.v1.MlsEntry.welcome = 6 singular bytes oneof entry
 field yapsta.v1.MlsExternalSender.certificate = 2 singular bytes
 field yapsta.v1.MlsExternalSender.key = 1 singular bytes
+field yapsta.v1.MlsGroupReset.account_id = 1 singular uint64
 field yapsta.v1.MlsLog.entries = 1 repeated .yapsta.v1.MlsEntry
 field yapsta.v1.MlsLog.has_more = 2 singular bool
 field yapsta.v1.MlsLogRequest.after_position = 2 singular uint64
@@ -840,6 +843,8 @@ field yapsta.v1.RequestMlsRejoin.key_package = 2 singular bytes
 field yapsta.v1.RequestMlsRejoin.reason = 3 singular .yapsta.v1.MlsRejoinReason
 field yapsta.v1.ReserveDm.account_ids = 2 repeated uint64
 field yapsta.v1.ReserveDm.kind = 1 singular .yapsta.v1.DmKind
+field yapsta.v1.ResetMlsGroup.commit = 2 singular .yapsta.v1.MlsCommit
+field yapsta.v1.ResetMlsGroup.dm_id = 1 singular uint64
 field yapsta.v1.Response.audit_page = 8 singular .yapsta.v1.AuditPage oneof kind
 field yapsta.v1.Response.ban_page = 9 singular .yapsta.v1.BanPage oneof kind
 field yapsta.v1.Response.blob = 2 singular .yapsta.v1.BlobData oneof kind
@@ -1214,6 +1219,7 @@ message yapsta.v1.MlsCommit
 message yapsta.v1.MlsDelivery
 message yapsta.v1.MlsEntry
 message yapsta.v1.MlsExternalSender
+message yapsta.v1.MlsGroupReset
 message yapsta.v1.MlsLog
 message yapsta.v1.MlsLogRequest
 message yapsta.v1.MlsRejoinRequested
@@ -1254,6 +1260,7 @@ message yapsta.v1.RenameEmoji
 message yapsta.v1.Request
 message yapsta.v1.RequestMlsRejoin
 message yapsta.v1.ReserveDm
+message yapsta.v1.ResetMlsGroup
 message yapsta.v1.Response
 message yapsta.v1.Resume
 message yapsta.v1.Resumed

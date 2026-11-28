@@ -8,7 +8,30 @@ other release (README.md, Versioning).
 
 ## [Unreleased]
 
+## [1.11.3] - 2026-11-28
+
+### Added
+
+- `reset_mls_group` (command 91), `ResetMlsGroup{dm_id, commit}`: when no
+  device of an MLS DM's group still counts, a current device of a member
+  replaces the group with a new one under the same DM, by the epoch-0 commit
+  of a new, random group id, checked as a new group's first commit is; the
+  reply is `Ack` (PROTOCOL.md § 6.19 "Resetting"). `MlsEntry.entry` gains
+  `group_reset` (9), `MlsGroupReset{account_id}`, the first entry of a reset
+  group's log, naming the member whose device reset it. § 6.19 gives when a
+  reset is allowed (`CONFLICT` otherwise), who may send it, the commit's
+  checks, the server's single step (old log, proposals, rejoin requests,
+  leaves and cursors dropped; positions keep increasing; `group_reset`, then
+  the Welcomes; `dm_updated` with the new `mls_group_id`), devices left out,
+  stored messages, the rate limits (per device and DM 3 an hour, burst 2;
+  per DM 3 a day) and what clients show. It replaces the sentence that left
+  the reset unspecified. Additive within minor 11, under `MLS_DMS`.
+- Redacting `Debug` for `MlsGroupReset` (never who reset the group); the
+  command's commit is redacted by `MlsCommit`'s own. Golden examples of the
+  command and the entry, and the command's minor and metrics name.
+
 ### Fixed
+
 
 - PROTOCOL.md § 6.19: `device_lists` also returns the caller's own list when it
   names itself, as servers already do; a device needs its own account's list.

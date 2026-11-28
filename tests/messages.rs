@@ -2210,6 +2210,78 @@ fn a_rejoin_request_is_minor_11_and_redacted() {
     assert!(shown.contains("reason: Fork"), "{shown}");
 }
 
+/// § 6.19 "Resetting": a group's reset, with the epoch-0 commit of the new
+/// group, and the first entries of the new group's log: `group_reset`, then
+/// a Welcome. Commit bytes and the
+/// resetting account are planted so the Debug test can look for them.
+fn mls_reset_examples() -> Vec<(&'static str, Envelope)> {
+    vec![
+        (
+            "m11_reset_mls_group",
+            Envelope {
+                request_id: 215,
+                last: false,
+                body: Some(Body::Command(Command {
+                    kind: Some(command::Kind::ResetMlsGroup(ResetMlsGroup {
+                        dm_id: 5,
+                        commit: Some(MlsCommit {
+                            epoch: 0,
+                            ..mls_commit()
+                        }),
+                    })),
+                })),
+            },
+        ),
+        (
+            "m11_mls_group_reset",
+            Envelope {
+                request_id: 0,
+                last: false,
+                body: Some(Body::Mls(MlsDelivery {
+                    entries: vec![
+                        MlsEntry {
+                            dm_id: 5,
+                            position: 19,
+                            epoch: 0,
+                            entry: Some(mls_entry::Entry::GroupReset(MlsGroupReset {
+                                account_id: 4_242_424,
+                            })),
+                        },
+                        MlsEntry {
+                            dm_id: 5,
+                            position: 20,
+                            epoch: 0,
+                            entry: Some(mls_entry::Entry::Welcome(mls_bytes(128))),
+                        },
+                    ],
+                })),
+            },
+        ),
+    ]
+}
+
+/// A reset is a minor-11 command, the 91st, named for metrics; and `Debug`
+/// shows neither the commit's bytes nor who reset the group.
+#[test]
+fn a_group_reset_is_minor_11_and_redacted() {
+    use yapsta_proto::{COMMAND_KIND_NAMES, command_kind_index, command_kind_name, command_minor};
+    let kind = command::Kind::ResetMlsGroup(ResetMlsGroup::default());
+    assert_eq!(command_minor(&kind), 11);
+    assert_eq!(command_kind_name(&kind), "reset_mls_group");
+    assert_eq!(command_kind_index(&kind), COMMAND_KIND_NAMES.len() - 1);
+    let planted = format!("{MLS_SECRET_BYTE}");
+    for (name, env) in mls_reset_examples() {
+        let shown = format!("{env:?}");
+        assert!(!shown.contains(&planted), "{name}: {shown}");
+        assert!(!shown.contains("4242424"), "{name}: {shown}");
+    }
+    let shown = format!("{:?}", mls_reset_examples()[0].1);
+    assert!(shown.contains("ResetMlsGroup"), "{shown}");
+    assert!(shown.contains("dm_id: 5"), "{shown}");
+    let shown = format!("{:?}", mls_reset_examples()[1].1);
+    assert!(shown.contains("GroupReset"), "{shown}");
+}
+
 /// § 6.19 "Content": a group DM's name travels as kind GROUP_NAME (5), an
 /// additive value of the minor-11 enum; its body is a `DmContent` inside
 /// the ciphertext (tests/dm_content.rs).
@@ -3334,6 +3406,7 @@ fn examples() -> Vec<(&'static str, Envelope)> {
     .chain(m11_mls_examples())
     .chain(dm_content_examples())
     .chain(mls_rejoin_examples())
+    .chain(mls_reset_examples())
     .chain(encrypted_upload_examples())
     .collect()
 }
