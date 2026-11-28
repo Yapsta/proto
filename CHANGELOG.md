@@ -8,6 +8,11 @@ other release (README.md, Versioning).
 
 ## [Unreleased]
 
+### Fixed
+
+- PROTOCOL.md § 6.19: `device_lists` also returns the caller's own list when it
+  names itself, as servers already do; a device needs its own account's list.
+
 ## [1.11.2] - 2026-11-27
 
 ### Added
